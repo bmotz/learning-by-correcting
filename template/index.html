@@ -1,0 +1,1234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Explain It For Meno</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;600;700&family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --color-background: #FAF7F2;
+            --color-surface: #FFFFFF;
+            --color-primary: #2A6F62;
+            --color-primary-light: #3D8A7B;
+            --color-accent: #C87850;
+            --color-agent: #E8D5C4;
+            --color-text: #2C2C2C;
+            --color-text-light: #666666;
+            --color-border: #E0D8CC;
+            --color-shadow: rgba(42, 111, 98, 0.08);
+            
+            --font-display: 'Crimson Pro', serif;
+            --font-body: 'Atkinson Hyperlegible', sans-serif;
+            
+            --spacing-xs: 0.5rem;
+            --spacing-sm: 1rem;
+            --spacing-md: 1.5rem;
+            --spacing-lg: 2rem;
+            --spacing-xl: 3rem;
+            
+            --border-radius: 12px;
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: var(--font-body);
+            background: var(--color-background);
+            color: var(--color-text);
+            line-height: 1.6;
+            padding: var(--spacing-md);
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: var(--spacing-xl);
+            animation: fadeIn 0.6s ease-out;
+        }
+        
+        h1 {
+            font-family: var(--font-display);
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--color-primary);
+            margin-bottom: var(--spacing-xs);
+            letter-spacing: -0.02em;
+        }
+        
+        .subtitle {
+            font-size: 1.1rem;
+            color: var(--color-text-light);
+            font-weight: 400;
+        }
+        
+        .card {
+            background: var(--color-surface);
+            border-radius: var(--border-radius);
+            padding: var(--spacing-lg);
+            margin-bottom: var(--spacing-md);
+            box-shadow: 0 2px 8px var(--color-shadow);
+            animation: slideUp 0.5s ease-out;
+        }
+        
+        .question-card {
+            border-left: 4px solid var(--color-primary);
+        }
+        
+        .question-text {
+            font-family: var(--font-display);
+            font-size: 1.3rem;
+            font-weight: 600;
+            margin-bottom: var(--spacing-md);
+            color: var(--color-text);
+            line-height: 1.4;
+        }
+        
+        .options {
+            display: flex;
+            flex-direction: column;
+            gap: var(--spacing-sm);
+        }
+        
+        .option-button {
+            background: var(--color-surface);
+            border: 2px solid var(--color-border);
+            border-radius: 8px;
+            padding: var(--spacing-md);
+            text-align: left;
+            cursor: pointer;
+            transition: var(--transition);
+            font-family: var(--font-body);
+            font-size: 1rem;
+            color: var(--color-text);
+        }
+        
+        .option-button:hover {
+            border-color: var(--color-primary-light);
+            background: rgba(42, 111, 98, 0.03);
+            transform: translateX(4px);
+        }
+        
+        .option-button.selected {
+            border-color: var(--color-primary);
+            background: rgba(42, 111, 98, 0.08);
+            font-weight: 700;
+        }
+        
+        .option-button.correct-answer {
+            background: rgba(76, 175, 80, 0.12);
+            border-color: #4CAF50;
+        }
+        
+        .option-button.student-choice::before {
+            content: "→ ";
+            color: var(--color-primary);
+            font-weight: bold;
+            margin-right: 0.5rem;
+        }
+        
+        .confidence-section {
+            margin-top: var(--spacing-lg);
+        }
+        
+        .confidence-label {
+            font-weight: 700;
+            margin-bottom: var(--spacing-sm);
+            display: block;
+            color: var(--color-text);
+        }
+        
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-md);
+        }
+        
+        .slider {
+            flex: 1;
+            height: 8px;
+            border-radius: 4px;
+            background: var(--color-border);
+            outline: none;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+        
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: var(--color-primary);
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            transition: var(--transition);
+        }
+        
+        .slider::-webkit-slider-thumb:hover {
+            background: var(--color-primary-light);
+            transform: scale(1.1);
+        }
+        
+        .slider::-moz-range-thumb {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: var(--color-primary);
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        .confidence-value {
+            font-weight: 700;
+            font-size: 1.2rem;
+            color: var(--color-primary);
+            min-width: 60px;
+            text-align: center;
+        }
+        
+        .framing-text {
+            background: rgba(200, 120, 80, 0.08);
+            border-left: 4px solid var(--color-accent);
+            padding: var(--spacing-md);
+            border-radius: 8px;
+            margin-bottom: var(--spacing-lg);
+            font-style: italic;
+            color: var(--color-text);
+        }
+        
+        .dialogue-heading {
+            font-size: 0.9rem;
+            color: #999;
+            text-align: center;
+        }
+        
+        .error-message {
+            background: rgba(244, 67, 54, 0.1);
+            border: 1px solid rgba(244, 67, 54, 0.3);
+            color: #c62828;
+            padding: var(--spacing-sm) var(--spacing-md);
+            border-radius: 8px;
+            font-weight: 500;
+            margin-top: 1rem;
+        }
+
+        .success-message {
+            background: rgba(76, 175, 80, 0.1);
+            border: 1px solid rgba(76, 175, 80, 0.3);
+            color: #2e7d32;
+            padding: var(--spacing-sm) var(--spacing-md);
+            border-radius: 8px;
+            font-weight: 500;
+            margin-top: 1rem;
+        }
+        
+        .dialogue-container {
+            display: flex;
+            flex-direction: column;
+            gap: var(--spacing-md);
+            margin-bottom: var(--spacing-md);
+            max-height: 600px;
+            overflow-y: auto;
+            padding: var(--spacing-sm);
+        }
+        
+        .message {
+            display: flex;
+            flex-direction: column;
+            animation: messageSlide 0.4s ease-out;
+        }
+        
+        .message-content {
+            padding: var(--spacing-md);
+            border-radius: var(--border-radius);
+            max-width: 85%;
+            line-height: 1.6;
+        }
+        
+        .message.student {
+            align-items: flex-end;
+        }
+        
+        .message.student .message-content {
+            background: var(--color-primary);
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+        
+        .message.agent {
+            align-items: flex-start;
+        }
+        
+        .message.agent .message-content {
+            background: var(--color-agent);
+            color: var(--color-text);
+            border-bottom-left-radius: 4px;
+            transition: background-color 0.4s ease, border-color 0.4s ease;
+        }
+        
+        /* Success state for MR3 */
+        .message.agent .message-content.success {
+            background: rgba(76, 175, 80, 0.12);
+            border: 2px solid #4CAF50;
+        }
+        
+        /* Fail state for MR3 */
+        .message.agent .message-content.fail {
+            background: var(--color-agent);
+        }
+        
+        .message-label {
+            font-size: 0.85rem;
+            font-weight: 700;
+            margin-bottom: var(--spacing-xs);
+            color: var(--color-text-light);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        
+        .input-section {
+            position: relative;
+        }
+        
+        .message-input {
+            width: 100%;
+            padding: var(--spacing-md);
+            padding-right: 60px;
+            border: 2px solid var(--color-border);
+            border-radius: var(--border-radius);
+            font-family: var(--font-body);
+            font-size: 1rem;
+            resize: vertical;
+            min-height: 100px;
+            transition: var(--transition);
+        }
+        
+        .message-input:focus {
+            outline: none;
+            border-color: var(--color-primary);
+            box-shadow: 0 0 0 3px rgba(42, 111, 98, 0.1);
+        }
+        
+        .char-count {
+            position: absolute;
+            bottom: var(--spacing-sm);
+            right: var(--spacing-sm);
+            font-size: 0.85rem;
+            color: var(--color-text-light);
+        }
+
+        .word-count-indicator {
+            font-size: 0.85rem;
+            color: var(--color-text-light);
+            align-self: center;
+            margin-left: var(--spacing-sm);
+        }
+        
+        .button {
+            background: var(--color-primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: var(--spacing-md) var(--spacing-lg);
+            font-family: var(--font-body);
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: var(--transition);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .button:hover:not(:disabled) {
+            background: var(--color-primary-light);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+        
+        .button:disabled {
+            background: var(--color-border);
+            color: var(--color-text-light);
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: var(--spacing-sm);
+            margin-top: var(--spacing-md);
+        }
+        
+        .result-card {
+            border-left: 4px solid var(--color-accent);
+            background: rgba(200, 120, 80, 0.05);
+        }
+        
+        .result-title {
+            font-family: var(--font-display);
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin-bottom: var(--spacing-sm);
+        }
+        
+        .result-title.pass {
+            color: var(--color-primary);
+        }
+        
+        .result-title.fail {
+            color: var(--color-accent);
+        }
+        
+        .feedback-text {
+            font-size: 1.1rem;
+            margin-bottom: var(--spacing-md);
+            line-height: 1.7;
+        }
+        
+        .hidden {
+            display: none !important;
+        }
+        
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        
+        .typing-indicator {
+            display: flex;
+            gap: 6px;
+            padding: var(--spacing-md);
+        }
+        
+        .typing-indicator span {
+            width: 8px;
+            height: 8px;
+            background: var(--color-text-light);
+            border-radius: 50%;
+            animation: typing 1.4s ease-in-out infinite;
+        }
+        
+        .typing-indicator span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+        
+        .typing-indicator span:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+        
+        /* Pulsing ellipses for 3rd turn thinking */
+        .thinking-ellipses {
+            display: flex;
+            gap: 10px;
+            padding: var(--spacing-md);
+            align-items: center;
+            justify-content: flex-start;
+        }
+        
+        .thinking-ellipses span {
+            width: 10px;
+            height: 10px;
+            background: var(--color-text-light);
+            border-radius: 50%;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+        
+        .thinking-ellipses span:nth-child(2) {
+            animation-delay: 0.3s;
+        }
+        
+        .thinking-ellipses span:nth-child(3) {
+            animation-delay: 0.6s;
+        }
+        
+        /* Static ellipses for fail state */
+        .thinking-ellipses.static span {
+            animation: none;
+            background: #999;
+        }
+        
+        /* Checkmark for success state */
+        .checkmark {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 24px;
+            height: 24px;
+            font-size: 18px;
+            color: #4CAF50;
+            animation: checkmarkAppear 0.3s ease-out;
+        }
+        
+        .error-message {
+            background: #FEE;
+            border: 2px solid #C66;
+            color: #833;
+            padding: var(--spacing-md);
+            border-radius: 8px;
+            margin-bottom: var(--spacing-md);
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        @keyframes messageSlide {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        @keyframes typing {
+            0%, 60%, 100% {
+                transform: translateY(0);
+                opacity: 0.5;
+            }
+            30% {
+                transform: translateY(-10px);
+                opacity: 1;
+            }
+        }
+        
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 0.4;
+                transform: scale(1);
+            }
+            50% {
+                opacity: 1;
+                transform: scale(1.2);
+            }
+        }
+        
+        @keyframes checkmarkAppear {
+            0% {
+                opacity: 0;
+                transform: scale(0);
+            }
+            50% {
+                transform: scale(1.2);
+            }
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Explain It For Meno</h1>
+            <p class="subtitle">Help Meno understand the correct answer</p>
+        </header>
+        
+        <!-- Demo Mode Banner -->
+        <div id="demo-banner" class="hidden" style="background: #FFF3CD; border: 2px solid #FFC107; border-radius: 8px; padding: 1rem; margin-bottom: 1.5rem; text-align: center;">
+            <strong>Demo Mode</strong> - This session is not being recorded. Feel free to experiment!
+        </div>
+        
+        <div id="error-container"></div>
+        
+        <!-- Phase 1: Initial Answer -->
+        <div id="phase-initial" class="card question-card">
+            <div class="question-text" id="question-text"></div>
+            <div class="options" id="options-container"></div>
+            <div id="options-reminder" style="display: none; margin-top: 1rem;"></div>
+            
+            <div class="confidence-section">
+                <label class="confidence-label">How confident are you in your answer?</label>
+                <div class="slider-container">
+                    <span>Not confident</span>
+                    <input type="range" class="slider" id="initial-confidence" min="0" max="100" value="50">
+                    <span>Very confident</span>
+                    <div class="confidence-value"><span id="initial-confidence-value">50</span>/100</div>
+                </div>
+            </div>
+            
+            <div class="button-group">
+                <button class="button" id="submit-initial" disabled>Continue</button>
+            </div>
+        </div>
+        
+        <!-- Phase 2: Dialogue -->
+        <div id="phase-dialogue" class="card hidden">
+            <div class="framing-text" id="framing-text"></div>
+            
+            <div class="dialogue-container" id="dialogue-container"></div>
+            
+            <div class="input-section">
+                <textarea 
+                    class="message-input" 
+                    id="message-input" 
+                    placeholder="Type your explanation here..."
+                    maxlength="2000"
+                ></textarea>
+                <span class="char-count"><span id="char-count">0</span>/2000</span>
+                <div class="button-group">
+                    <button class="button" id="send-message" disabled>Send</button>
+                    <span id="word-count-indicator" class="word-count-indicator">(0/10 word minimum)</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Phase 3: Final Confidence -->
+        <div id="phase-final-confidence" class="card hidden">
+            <h2 style="font-family: var(--font-display); margin-bottom: var(--spacing-md);">How confident are you now?</h2>
+            <p style="margin-bottom: var(--spacing-lg);">After teaching Meno, how confident are you in the correct answer?</p>
+            
+            <div class="confidence-section">
+                <label class="confidence-label">Your confidence level:</label>
+                <div class="slider-container">
+                    <span>Not confident</span>
+                    <input type="range" class="slider" id="final-confidence" min="0" max="100" value="50">
+                    <span>Very confident</span>
+                    <div class="confidence-value"><span id="final-confidence-value">50</span>/100</div>
+                </div>
+            </div>
+            
+            <div class="button-group">
+                <button class="button" id="submit-final">Submit & Continue</button>
+            </div>
+        </div>
+        
+        <!-- Phase 4: Results -->
+        <div id="phase-results" class="card result-card hidden">
+            <h2 class="result-title" id="result-title"></h2>
+            <p class="feedback-text" id="feedback-text"></p>
+            <div class="button-group">
+                <button class="button" id="return-button">Return to Course</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let sessionData = null;
+        let launchToken = null;
+        let selectedAnswer = null;
+        
+        // Get launch token from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        launchToken = urlParams.get('launch_token');
+        
+        if (!launchToken) {
+            showError('No launch token found');
+        }
+        
+        // Check if demo mode
+        const isDemo = launchToken && (launchToken.startsWith('demo_') || launchToken === '00000000-0000-4000-B000-000000000000');
+        if (isDemo) {
+            document.getElementById('demo-banner').classList.remove('hidden');
+        }
+        
+        async function init() {
+            try {
+                const response = await fetch(`/api/session/${launchToken}`);
+                sessionData = await response.json();
+                
+                // Display question
+                document.getElementById('question-text').textContent = sessionData.question.question_text;
+                
+                const optionsContainer = document.getElementById('options-container');
+                Object.entries(sessionData.question.options).forEach(([key, text]) => {
+                    const button = document.createElement('button');
+                    button.className = 'option-button';
+                    button.textContent = `${key}. ${text}`;
+                    button.onclick = () => selectAnswer(key, button);
+                    optionsContainer.appendChild(button);
+                });
+                
+                // Setup confidence slider
+                const confidenceSlider = document.getElementById('initial-confidence');
+                const confidenceValue = document.getElementById('initial-confidence-value');
+                confidenceSlider.oninput = (e) => {
+                    confidenceValue.textContent = e.target.value;
+                };
+                
+                // Check if already have initial answer (returning to session)
+                if (sessionData.student_initial_answer) {
+                    startDialogue();
+                }
+                
+            } catch (error) {
+                showError(error.message);
+            }
+        }
+        
+        function selectAnswer(answer, button) {
+            // Remove previous selection
+            document.querySelectorAll('.option-button').forEach(btn => {
+                btn.classList.remove('selected');
+            });
+            
+            // Add selection to clicked button
+            button.classList.add('selected');
+            selectedAnswer = answer;
+            
+            // Enable continue button
+            document.getElementById('submit-initial').disabled = false;
+        }
+        
+        document.getElementById('submit-initial').onclick = async () => {
+            if (!selectedAnswer) return;
+            
+            const confidence = document.getElementById('initial-confidence').value;
+            
+            try {
+                await fetch(`/api/session/${launchToken}/initial`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        answer: selectedAnswer,
+                        confidence: parseInt(confidence)
+                    })
+                });
+                
+                // Reload session to get Meno's opening message
+                const response = await fetch(`/api/session/${launchToken}`);
+                sessionData = await response.json();
+                
+                startDialogue();
+            } catch (error) {
+                showError(error.message);
+            }
+        };
+        
+        function startDialogue() {
+            // Don't hide phase-initial, but transform it into reminder mode
+            const phaseInitial = document.getElementById('phase-initial');
+            
+            // Hide the large clickable buttons
+            document.getElementById('options-container').style.display = 'none';
+            
+            // Hide confidence section
+            document.querySelector('#phase-initial .confidence-section').style.display = 'none';
+            
+            // Hide Continue button
+            document.getElementById('submit-initial').style.display = 'none';
+            
+            // Show compact options reminder
+            const optionsReminder = document.getElementById('options-reminder');
+            optionsReminder.style.display = 'block';
+            optionsReminder.innerHTML = '';
+            
+            const question = sessionData.question;
+            const correctAnswer = question.correct_answer;
+            const studentAnswer = sessionData.student_initial_answer;
+            
+            Object.entries(question.options).forEach(([key, text]) => {
+                const optionDiv = document.createElement('div');
+                optionDiv.style.padding = '0.5rem';
+                optionDiv.style.marginBottom = '0.25rem';
+                optionDiv.style.borderRadius = '4px';
+                
+                // Highlight correct answer with pale green
+                if (key === correctAnswer) {
+                    optionDiv.style.background = 'rgba(76, 175, 80, 0.12)';
+                    optionDiv.style.border = '2px solid #4CAF50';
+                }
+                
+                let optionHTML = `<strong>${key}.</strong> ${text}`;
+                
+                // Add arrow marker for student's choice
+                if (key === studentAnswer) {
+                    optionHTML = `<span style="color: var(--color-primary); font-weight: bold; margin-right: 0.5rem;">→</span>` + optionHTML;
+                }
+                
+                optionDiv.innerHTML = optionHTML;
+                optionsReminder.appendChild(optionDiv);
+            });
+            
+            // Show dialogue phase
+            document.getElementById('phase-dialogue').classList.remove('hidden');
+
+            // Set framing text
+            const correct = sessionData.question.correct_answer;
+            const studentChoice = sessionData.student_initial_answer;
+            const agentChoice = sessionData.question.misconception_answer;
+            const correctText = sessionData.question.options[correct];
+            
+            let framingText = '';
+            if (studentChoice === correct) {
+                framingText = `The correct answer is ${correct} (${correctText}). You initially chose this same answer. Now teach Meno why that reasoning is correct.`;
+            } else if (studentChoice === agentChoice) {
+                framingText = `The correct answer is ${correct} (${correctText}). You initially chose ${studentChoice}, which is the same misconception Meno has. Teach Meno why that reasoning is mistaken.`;
+            } else {
+                framingText = `The correct answer is ${correct} (${correctText}). You initially chose ${studentChoice}, but Meno chose ${agentChoice}. Teach Meno why their misconception is wrong.`;
+            }
+            
+            document.getElementById('framing-text').textContent = framingText;
+            
+            // Display existing dialogue
+            const container = document.getElementById('dialogue-container');
+            container.innerHTML = '';
+            
+            sessionData.dialogue.forEach(turn => {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = `message ${turn.role}`;
+                messageDiv.innerHTML = `
+                    <div class="message-label">${turn.role === 'student' ? 'You' : 'Meno'}</div>
+                    <div class="message-content">${turn.message}</div>
+                `;
+                container.appendChild(messageDiv);
+            });
+            
+            container.scrollTop = container.scrollHeight;
+            
+            // Setup message input
+            const messageInput = document.getElementById('message-input');
+            const sendButton = document.getElementById('send-message');
+            const charCount = document.getElementById('char-count');
+            const wordCountIndicator = document.getElementById('word-count-indicator');
+
+            messageInput.oninput = () => {
+                const text = messageInput.value.trim();
+                charCount.textContent = messageInput.value.length;
+                
+                // Count words
+                const words = text.split(/\s+/).filter(word => word.length > 0);
+                const wordCount = words.length;
+                
+                // Update button and indicator based on word count
+                if (wordCount >= 10) {
+                    sendButton.disabled = false;
+                    wordCountIndicator.style.display = 'none';
+                } else {
+                    sendButton.disabled = true;
+                    wordCountIndicator.style.display = 'inline';
+                    wordCountIndicator.textContent = `(${wordCount}/10 word minimum)`;
+                }
+            };
+            
+            messageInput.onkeypress = (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    if (!sendButton.disabled) {
+                        sendMessage();
+                    }
+                }
+            };
+            
+            sendButton.onclick = sendMessage;
+            
+            // Check if dialogue is already complete
+            if (sessionData.agent_decision) {
+                messageInput.disabled = true;
+                sendButton.disabled = true;
+                
+                if (sessionData.agent_decision.assessment === 'PASS') {
+                    showFinalConfidence();
+                } else {
+                    showResults();
+                }
+            } else {
+                messageInput.focus();
+            }
+        }
+        
+        async function sendMessage() {
+            const messageInput = document.getElementById('message-input');
+            const message = messageInput.value.trim();
+            
+            if (!message) return;
+            
+            // Disable input
+            messageInput.disabled = true;
+            document.getElementById('send-message').disabled = true;
+            
+            // Add student message to display
+            const container = document.getElementById('dialogue-container');
+            const studentDiv = document.createElement('div');
+            studentDiv.className = 'message student';
+            studentDiv.innerHTML = `
+                <div class="message-label">You</div>
+                <div class="message-content">${message}</div>
+            `;
+            container.appendChild(studentDiv);
+            container.scrollTop = container.scrollHeight;
+            
+            // Clear input
+            messageInput.value = '';
+            document.getElementById('char-count').textContent = '0';
+            
+            // Show typing indicator
+            const typingDiv = document.createElement('div');
+            typingDiv.className = 'message agent';
+            typingDiv.innerHTML = '<div class="message-label">Meno</div><div class="message-content typing-indicator"><span></span><span></span><span></span></div>';
+            container.appendChild(typingDiv);
+            container.scrollTop = container.scrollHeight;
+            
+            try {
+                // Send the message
+                const response = await fetch(`/api/session/${launchToken}/message`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({message})
+                });
+                
+                // Check if this is a JSON response (pre-filter failure, LLM recovery, or 3rd turn completion)
+                const contentType = response.headers.get('content-type');
+                
+                if (contentType && contentType.includes('application/json')) {
+                    // Remove typing indicator
+                    typingDiv.remove();
+                    
+                    // This is a JSON response
+                    const data = await response.json();
+                    console.log('[DEBUG] JSON response:', data);
+                    
+                    // Handle 3rd turn completion
+                    if (data.status === 'third_turn_complete') {
+                        console.log('[DEBUG] 3rd turn complete:', data.assessment);
+                        await handleThirdTurnCompletion(data);
+                        return;
+                    }
+                    
+                    if (data.status === 'failed') {
+                        // Pre-filter failure (profanity/gibberish)
+                        // Show the failure message
+                        const errorDiv = document.createElement('div');
+                        errorDiv.className = 'error-message';
+                        errorDiv.textContent = data.message || 'Dialogue ended due to insufficient response';
+                        container.appendChild(errorDiv);
+                        
+                        // Disable further input
+                        messageInput.disabled = true;
+                        document.getElementById('send-message').disabled = true;
+                        
+                        // If skip_confidence is true, show results directly
+                        if (data.skip_confidence) {
+                            // Reload session to get the decision
+                            const sessionResponse = await fetch(`/api/session/${launchToken}`);
+                            sessionData = await sessionResponse.json();
+                            
+                            // Show results directly without confidence
+                            showResults();
+                        }
+                        return;
+                    } else if (data.status === 'completed') {
+                        // LLM recovery successful pass
+                        const successDiv = document.createElement('div');
+                        successDiv.className = 'success-message';
+                        successDiv.textContent = data.message || 'Good explanation provided';
+                        container.appendChild(successDiv);
+                        
+                        // Reload session
+                        const sessionResponse = await fetch(`/api/session/${launchToken}`);
+                        sessionData = await sessionResponse.json();
+                        
+                        // Check skip_confidence flag
+                        if (data.skip_confidence === false) {
+                            showFinalConfidence();
+                        } else {
+                            showResults();
+                        }
+                        return;
+                    }
+                }
+                
+                // Handle SSE stream response (normal dialogue for turns 1 and 2)
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Failed to send message');
+                }
+                
+                // Remove typing indicator
+                typingDiv.remove();
+                
+                // Add agent message placeholder
+                const agentDiv = document.createElement('div');
+                agentDiv.className = 'message agent';
+                agentDiv.innerHTML = '<div class="message-label">Meno</div><div class="message-content"></div>';
+                container.appendChild(agentDiv);
+                const agentContent = agentDiv.querySelector('.message-content');
+                
+                // Handle SSE stream with proper buffering
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let agentResponse = '';
+                let buffer = ''; // Buffer for partial lines
+                
+                console.log('[DEBUG] Starting to read stream...');
+                
+                while (true) {
+                    const {done, value} = await reader.read();
+                    if (done) {
+                        console.log('[DEBUG] Stream done');
+                        break;
+                    }
+                    
+                    const chunk = decoder.decode(value, {stream: true}); // Important: {stream: true}
+                    buffer += chunk; // Add to buffer
+                    
+                    console.log('[DEBUG] Received chunk:', chunk.substring(0, 100));
+                    
+                    // Process complete lines from buffer
+                    const lines = buffer.split('\n');
+                    
+                    // Keep the last (potentially incomplete) line in buffer
+                    buffer = lines.pop() || '';
+                    
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const data = line.substring(6); // Don't trim - spaces matter!
+                            console.log('[DEBUG] Extracted data:', data);
+                            if (data) {
+                                agentResponse += data;
+                                agentContent.textContent = agentResponse;
+                                console.log('[DEBUG] Current response length:', agentResponse.length);
+                                container.scrollTop = container.scrollHeight;
+                            }
+                        }
+                    }
+                }
+                
+                // Process any remaining data in buffer
+                if (buffer.startsWith('data: ')) {
+                    const data = buffer.substring(6);
+                    if (data) {
+                        agentResponse += data;
+                        agentContent.textContent = agentResponse;
+                    }
+                }
+                
+                // Check for LLM failure message (special case)
+                if (agentResponse.includes('technical difficulties')) {
+                    // This is LLM failure recovery mode
+                    messageInput.disabled = false;
+                    document.getElementById('send-message').disabled = false;
+                    messageInput.placeholder = 'Please explain why the correct answer is right (minimum 10 words)';
+                    messageInput.focus();
+                    return; // Don't check for decision yet
+                }
+                
+                // Reload session to get updated data
+                const sessionResponse = await fetch(`/api/session/${launchToken}`);
+                sessionData = await sessionResponse.json();
+                
+                // Check if dialogue is complete
+                if (sessionData.agent_decision) {
+                    // Only show confidence for PASS, skip for FAIL
+                    if (sessionData.agent_decision.assessment === 'PASS') {
+                        showFinalConfidence();
+                    } else {
+                        // This is a FAIL - skip confidence and go straight to results
+                        showResults();
+                    }
+                } else {
+                    // Re-enable input
+                    messageInput.disabled = false;
+                    document.getElementById('send-message').disabled = false;
+                    messageInput.focus();
+                }
+                
+            } catch (error) {
+                if (typingDiv.parentNode) typingDiv.remove();
+                showError(error.message);
+                messageInput.disabled = false;
+                document.getElementById('send-message').disabled = false;
+            }
+        }
+        
+        async function handleThirdTurnCompletion(data) {
+            // Show Meno box with thinking ellipses
+            const container = document.getElementById('dialogue-container');
+            const thinkingDiv = document.createElement('div');
+            thinkingDiv.className = 'message agent';
+            thinkingDiv.innerHTML = '<div class="message-label">Meno</div><div class="message-content thinking-ellipses"><span></span><span></span><span></span></div>';
+            container.appendChild(thinkingDiv);
+            container.scrollTop = container.scrollHeight;
+            
+            const thinkingContent = thinkingDiv.querySelector('.message-content');
+            const ellipses = thinkingDiv.querySelector('.thinking-ellipses');
+            
+            // Wait a moment for effect
+            await new Promise(resolve => setTimeout(resolve, 800));
+            
+            // Reload session to get updated data
+            const sessionResponse = await fetch(`/api/session/${launchToken}`);
+            sessionData = await sessionResponse.json();
+            
+            if (data.assessment === 'PASS') {
+                // Success state
+                console.log('[DEBUG] Showing success state');
+                
+                // Turn box green
+                thinkingContent.classList.add('success');
+
+                // Remove the thinking-ellipses class to stop the pulse animation
+                ellipses.classList.remove('thinking-ellipses');
+
+                // Replace ellipses with checkmark
+                ellipses.innerHTML = '<span class="checkmark">✓</span>';
+                
+                // Wait for animation
+                await new Promise(resolve => setTimeout(resolve, 400));
+                
+                // Show confidence slider
+                showFinalConfidence();
+                
+            } else {
+                // Fail state
+                console.log('[DEBUG] Showing fail state');
+                
+                // Keep box beige (default), make ellipses static and gray
+                ellipses.classList.add('static');
+                
+                // Wait a moment
+                await new Promise(resolve => setTimeout(resolve, 600));
+                
+                // Show results directly
+                showResults();
+            }
+        }
+        
+        function showFinalConfidence() {
+            // Keep dialogue visible, just hide the input section
+            document.getElementById('message-input').disabled = true;
+            document.getElementById('send-message').disabled = true;
+            document.querySelector('.input-section').style.display = 'none';
+            
+            // Show final confidence card
+            document.getElementById('phase-final-confidence').classList.remove('hidden');
+            
+            const confidenceSlider = document.getElementById('final-confidence');
+            const confidenceValue = document.getElementById('final-confidence-value');
+            
+            // Set to initial confidence as starting point
+            confidenceSlider.value = sessionData.student_initial_confidence || 50;
+            confidenceValue.textContent = confidenceSlider.value;
+            
+            confidenceSlider.oninput = (e) => {
+                confidenceValue.textContent = e.target.value;
+            };
+            
+            // Scroll to bottom to show the new confidence card
+            window.scrollTo(0, document.body.scrollHeight);
+        }
+        
+        document.getElementById('submit-final').onclick = async () => {
+            const confidence = document.getElementById('final-confidence').value;
+            
+            try {
+                await fetch(`/api/session/${launchToken}/confidence`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        confidence: parseInt(confidence)
+                    })
+                });
+                
+                sessionData.student_final_confidence = parseInt(confidence);
+                showResults();
+            } catch (error) {
+                showError(error.message);
+            }
+        };
+        
+        function showResults() {
+            // Keep dialogue visible, hide final confidence if it's showing
+            const finalConfidenceElement = document.getElementById('phase-final-confidence');
+            if (finalConfidenceElement && !finalConfidenceElement.classList.contains('hidden')) {
+                finalConfidenceElement.classList.add('hidden');
+            }
+            
+            // Show results card (dialogue and question remain visible above)
+            document.getElementById('phase-results').classList.remove('hidden');
+            
+            const decision = sessionData.agent_decision;
+            const isPassed = decision && decision.assessment === 'PASS';
+            
+            const resultTitle = document.getElementById('result-title');
+            resultTitle.textContent = isPassed ? '✓ Teaching Successful' : '○ More Practice Needed';
+            resultTitle.className = `result-title ${isPassed ? 'pass' : 'fail'}`;
+            
+            // Handle different feedback scenarios
+            let feedbackText = '';
+            if (decision && decision.feedback) {
+                feedbackText = decision.feedback;
+            } else if (sessionData.safety_violations && sessionData.safety_violations.length > 0) {
+                const violation = sessionData.safety_violations[0];
+                feedbackText = `Dialogue ended due to ${violation.replace(/_/g, ' ')}`;
+            } else {
+                feedbackText = 'The dialogue could not be completed.';
+            }
+            
+            document.getElementById('feedback-text').textContent = feedbackText;
+            
+            // Scroll to show results
+            window.scrollTo(0, document.body.scrollHeight);
+        }
+        
+        document.getElementById('return-button').onclick = async () => {
+            try {
+                const response = await fetch(`/api/session/${launchToken}/complete`, {
+                    method: 'POST'
+                });
+                
+                const data = await response.json();
+                
+                // Check if demo completion
+                if (data.redirect_url.includes('demo_complete=true')) {
+                    // Demo mode - offer to restart
+                    if (confirm('Demo complete! Would you like to try another question?')) {
+                        window.location.href = '/';
+                    }
+                } else {
+                    // Normal mode - return to Terracotta
+                    window.location.href = data.redirect_url;
+                }
+            } catch (error) {
+                showError(error.message);
+            }
+        };
+        
+        function showError(message) {
+            const errorContainer = document.getElementById('error-container');
+            errorContainer.innerHTML = `<div class="error-message">${message}</div>`;
+        }
+        
+        // Initialize on load
+        init();
+    </script>
+</body>
+</html>
