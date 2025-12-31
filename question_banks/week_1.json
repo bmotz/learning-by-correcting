@@ -1,0 +1,102 @@
+{
+  "week": 1,
+  "topic": "Introduction to Cognitive Psychology",
+  "questions": [
+    {
+      "id": "w1_q1",
+      "condition": "ODD",
+      "question_text": "Which of the following best describes the cognitive revolution in psychology?",
+      "options": {
+        "A": "A shift from studying observable behavior to studying mental processes",
+        "B": "The invention of brain imaging technology",
+        "C": "The discovery that all learning is based on reinforcement",
+        "D": "The development of psychoanalytic theory"
+      },
+      "correct_answer": "A",
+      "misconception_answer": "B",
+      "misconception_description": "The cognitive revolution was triggered by brain imaging technology rather than a theoretical shift in focus from behaviorism to mental processes.",
+      "agent_initial_confidence": 75,
+      "concept_tags": ["cognitive_revolution", "history", "mental_processes"]
+    },
+    {
+      "id": "w1_q2",
+      "condition": "EVEN",
+      "question_text": "Which of the following best describes the cognitive revolution in psychology?",
+      "options": {
+        "A": "A shift from studying observable behavior to studying mental processes",
+        "B": "The invention of brain imaging technology",
+        "C": "The discovery that all learning is based on reinforcement",
+        "D": "The development of psychoanalytic theory"
+      },
+      "correct_answer": "A",
+      "misconception_answer": "B",
+      "misconception_description": "The cognitive revolution was triggered by brain imaging technology rather than a theoretical shift in focus from behaviorism to mental processes.",
+      "agent_initial_confidence": 75,
+      "concept_tags": ["cognitive_revolution", "history", "mental_processes"]
+    },
+    {
+      "id": "w1_q3",
+      "condition": "ODD",
+      "question_text": "What is the primary function of working memory?",
+      "options": {
+        "A": "To store information permanently for later retrieval",
+        "B": "To temporarily hold and manipulate information during cognitive tasks",
+        "C": "To automatically process sensory information without attention",
+        "D": "To consolidate memories during sleep"
+      },
+      "correct_answer": "B",
+      "misconception_answer": "A",
+      "misconception_description": "Working memory is the same as with long-term memory, believing working memory is for permanent storage rather than temporary active processing.",
+      "agent_initial_confidence": 80,
+      "concept_tags": ["working_memory", "memory_systems", "cognitive_processes"]
+    },
+    {
+      "id": "w1_q4",
+      "condition": "EVEN",
+      "question_text": "What is the primary function of working memory?",
+      "options": {
+        "A": "To store information permanently for later retrieval",
+        "B": "To temporarily hold and manipulate information during cognitive tasks",
+        "C": "To automatically process sensory information without attention",
+        "D": "To consolidate memories during sleep"
+      },
+      "correct_answer": "B",
+      "misconception_answer": "A",
+      "misconception_description": "The agent confuses working memory with long-term memory, believing working memory is for permanent storage rather than temporary active processing.",
+      "agent_initial_confidence": 80,
+      "concept_tags": ["working_memory", "memory_systems", "cognitive_processes"]
+    },
+    {
+      "id": "w1_q5",
+      "condition": "ODD",
+      "question_text": "Which example best demonstrates automatic processing?",
+      "options": {
+        "A": "Learning a new phone number by repeating it",
+        "B": "Reading words fluently after years of practice",
+        "C": "Solving a complex math problem step by step",
+        "D": "Trying to remember what you ate for breakfast"
+      },
+      "correct_answer": "B",
+      "misconception_answer": "D",
+      "misconception_description": "The agent thinks retrieval from memory is always automatic, failing to distinguish between effortful recall and truly automatic processes that occur without attention.",
+      "agent_initial_confidence": 70,
+      "concept_tags": ["automatic_processing", "attention", "skill_learning"]
+    },
+    {
+      "id": "w1_q6",
+      "condition": "EVEN",
+      "question_text": "Which example best demonstrates automatic processing?",
+      "options": {
+        "A": "Learning a new phone number by repeating it",
+        "B": "Reading words fluently after years of practice",
+        "C": "Solving a complex math problem step by step",
+        "D": "Trying to remember what you ate for breakfast"
+      },
+      "correct_answer": "B",
+      "misconception_answer": "D",
+      "misconception_description": "The agent thinks retrieval from memory is always automatic, failing to distinguish between effortful recall and truly automatic processes that occur without attention.",
+      "agent_initial_confidence": 70,
+      "concept_tags": ["automatic_processing", "attention", "skill_learning"]
+    }
+  ]
+}
