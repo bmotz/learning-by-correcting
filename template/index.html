@@ -42,10 +42,11 @@
         
         body {
             font-family: var(--font-body);
+            font-size: 16px; /* Explicit base size for mobile */
             background: var(--color-background);
             color: var(--color-text);
             line-height: 1.6;
-            padding: var(--spacing-md);
+            padding: clamp(0.5rem, 3vw, 1.5rem); /* Responsive padding */
             min-height: 100vh;
         }
         
@@ -114,12 +115,19 @@
             font-family: var(--font-body);
             font-size: 1rem;
             color: var(--color-text);
+            min-height: 44px; /* Accessible touch target */
         }
         
         .option-button:hover {
             border-color: var(--color-primary-light);
             background: rgba(42, 111, 98, 0.03);
             transform: translateX(4px);
+        }
+        
+        /* Focus indicator for accessibility */
+        .option-button:focus {
+            outline: 3px solid var(--color-primary);
+            outline-offset: 2px;
         }
         
         .option-button.selected {
@@ -151,6 +159,13 @@
             color: var(--color-text);
         }
         
+        /* NEW: Instruction text for slider */
+        .slider-instruction {
+            font-weight: 400;
+            color: var(--color-text-light);
+            margin-left: 0.25rem;
+        }
+        
         .slider-container {
             display: flex;
             align-items: center;
@@ -167,16 +182,24 @@
             appearance: none;
         }
         
+        /* Focus indicator for slider accessibility */
+        .slider:focus {
+            outline: 3px solid var(--color-primary);
+            outline-offset: 4px;
+        }
+        
+        /* Larger thumb for mobile touch targets */
         .slider::-webkit-slider-thumb {
             -webkit-appearance: none;
             appearance: none;
-            width: 24px;
-            height: 24px;
+            width: 32px;  /* Increased from 24px */
+            height: 32px; /* Increased from 24px */
             border-radius: 50%;
             background: var(--color-primary);
             cursor: pointer;
             box-shadow: 0 2px 4px rgba(0,0,0,0.2);
             transition: var(--transition);
+            opacity: 0; /* NEW: Start invisible */
         }
         
         .slider::-webkit-slider-thumb:hover {
@@ -185,13 +208,23 @@
         }
         
         .slider::-moz-range-thumb {
-            width: 24px;
-            height: 24px;
+            width: 32px;  /* Increased from 24px */
+            height: 32px; /* Increased from 24px */
             border-radius: 50%;
             background: var(--color-primary);
             cursor: pointer;
             border: none;
             box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            opacity: 0; /* NEW: Start invisible */
+        }
+        
+        /* NEW: Show thumb after interaction */
+        .slider.interacted::-webkit-slider-thumb {
+            opacity: 1;
+        }
+        
+        .slider.interacted::-moz-range-thumb {
+            opacity: 1;
         }
         
         .confidence-value {
@@ -200,6 +233,13 @@
             color: var(--color-primary);
             min-width: 60px;
             text-align: center;
+            opacity: 0; /* NEW: Start invisible */
+            transition: opacity 0.3s ease;
+        }
+        
+        /* NEW: Show value after interaction */
+        .confidence-value.visible {
+            opacity: 1;
         }
         
         .framing-text {
@@ -553,6 +593,44 @@
                 transform: scale(1);
             }
         }
+        
+        /* Mobile responsive breakpoint */
+        @media (max-width: 640px) {
+            h1 {
+                font-size: 2rem; /* Smaller on mobile */
+            }
+            
+            .subtitle {
+                font-size: 1rem;
+            }
+            
+            .question-text {
+                font-size: 1.1rem;
+            }
+            
+            .card {
+                padding: var(--spacing-md); /* Reduce padding on small screens */
+            }
+            
+            .message-content {
+                max-width: 95%; /* More width on mobile */
+            }
+        }
+        
+        /* Additional focus indicators for buttons and interactive elements */
+        .button:focus,
+        textarea:focus,
+        input[type="range"]:focus {
+            outline: 3px solid var(--color-primary);
+            outline-offset: 2px;
+        }
+        
+        /* Ensure keyboard focus is visible */
+        button:focus-visible,
+        .option-button:focus-visible {
+            outline: 3px solid var(--color-primary);
+            outline-offset: 2px;
+        }
     </style>
 </head>
 <body>
@@ -576,12 +654,25 @@
             <div id="options-reminder" style="display: none; margin-top: 1rem;"></div>
             
             <div class="confidence-section">
-                <label class="confidence-label">How confident are you in your answer?</label>
+                <label for="initial-confidence" class="confidence-label">
+                    How confident are you in your answer? 
+                    <span class="slider-instruction">(Click the slider below)</span>
+                </label>
                 <div class="slider-container">
                     <span>Not confident</span>
-                    <input type="range" class="slider" id="initial-confidence" min="0" max="100" value="50">
+                    <input 
+                        type="range" 
+                        class="slider" 
+                        id="initial-confidence" 
+                        min="0" 
+                        max="100"
+                        aria-label="Initial confidence level"
+                        aria-valuemin="0"
+                        aria-valuemax="100"
+                        aria-valuenow="50"
+                        aria-live="polite">
                     <span>Very confident</span>
-                    <div class="confidence-value"><span id="initial-confidence-value">50</span>/100</div>
+                    <div class="confidence-value" aria-live="polite"><span id="initial-confidence-value"></span></div>
                 </div>
             </div>
             
@@ -594,7 +685,7 @@
         <div id="phase-dialogue" class="card hidden">
             <div class="framing-text" id="framing-text"></div>
             
-            <div class="dialogue-container" id="dialogue-container"></div>
+            <div class="dialogue-container" id="dialogue-container" aria-live="polite" aria-relevant="additions"></div>
             
             <div class="input-section">
                 <textarea 
@@ -617,12 +708,25 @@
             <p style="margin-bottom: var(--spacing-lg);">After teaching Meno, how confident are you in the correct answer?</p>
             
             <div class="confidence-section">
-                <label class="confidence-label">Your confidence level:</label>
+                <label for="final-confidence" class="confidence-label">
+                    Your confidence level: 
+                    <span class="slider-instruction">(Click the slider below)</span>
+                </label>
                 <div class="slider-container">
                     <span>Not confident</span>
-                    <input type="range" class="slider" id="final-confidence" min="0" max="100" value="50">
+                    <input 
+                        type="range" 
+                        class="slider" 
+                        id="final-confidence" 
+                        min="0" 
+                        max="100"
+                        aria-label="Final confidence level"
+                        aria-valuemin="0"
+                        aria-valuemax="100"
+                        aria-valuenow="50"
+                        aria-live="polite">
                     <span>Very confident</span>
-                    <div class="confidence-value"><span id="final-confidence-value">50</span>/100</div>
+                    <div class="confidence-value" aria-live="polite"><span id="final-confidence-value"></span></div>
                 </div>
             </div>
             
@@ -655,7 +759,7 @@
         }
         
         // Check if demo mode
-        const isDemo = launchToken && (launchToken.startsWith('demo_') || launchToken === '00000000-0000-4000-B000-000000000000');
+        const isDemo = launchToken && (launchToken === 'demo_session' || launchToken === '00000000-0000-4000-B000-000000000000');
         if (isDemo) {
             document.getElementById('demo-banner').classList.remove('hidden');
         }
@@ -677,12 +781,30 @@
                     optionsContainer.appendChild(button);
                 });
                 
-                // Setup confidence slider
+                // Setup initial confidence slider with interaction tracking
                 const confidenceSlider = document.getElementById('initial-confidence');
                 const confidenceValue = document.getElementById('initial-confidence-value');
+                const submitButton = document.getElementById('submit-initial');
+                let initialConfidenceTimestamp = null;
+                let sliderHasBeenInteracted = false;
+                
                 confidenceSlider.oninput = (e) => {
-                    confidenceValue.textContent = e.target.value;
+                    // On first interaction, make slider and value visible
+                    if (!sliderHasBeenInteracted) {
+                        sliderHasBeenInteracted = true;
+                        confidenceSlider.classList.add('interacted');
+                        document.getElementById('initial-confidence-value').parentElement.classList.add('visible');
+                        submitButton.disabled = false; // Enable continue button
+                    }
+                    
+                    // Update value display and timestamp
+                    confidenceValue.textContent = e.target.value + '/100';
+                    e.target.setAttribute('aria-valuenow', e.target.value);
+                    initialConfidenceTimestamp = new Date().toISOString();
                 };
+                
+                // Store timestamp for submission
+                window.getInitialConfidenceTimestamp = () => initialConfidenceTimestamp;
                 
                 // Check if already have initial answer (returning to session)
                 if (sessionData.student_initial_answer) {
@@ -704,14 +826,19 @@
             button.classList.add('selected');
             selectedAnswer = answer;
             
-            // Enable continue button
-            document.getElementById('submit-initial').disabled = false;
+            // Note: Button will be enabled by slider interaction
+        }
+
+        // Clean role prefixes from displayed text
+        function cleanRolePrefix(text) {
+            return text.replace(/^(Student|Agent|Meno)\s*:\s*/i, '');
         }
         
         document.getElementById('submit-initial').onclick = async () => {
             if (!selectedAnswer) return;
             
             const confidence = document.getElementById('initial-confidence').value;
+            const confidenceTimestamp = window.getInitialConfidenceTimestamp();
             
             try {
                 await fetch(`/api/session/${launchToken}/initial`, {
@@ -719,7 +846,8 @@
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
                         answer: selectedAnswer,
-                        confidence: parseInt(confidence)
+                        confidence: parseInt(confidence),
+                        confidence_timestamp: confidenceTimestamp
                     })
                 });
                 
@@ -909,19 +1037,20 @@
                 const contentType = response.headers.get('content-type');
                 
                 if (contentType && contentType.includes('application/json')) {
-                    // Remove typing indicator
-                    typingDiv.remove();
                     
                     // This is a JSON response
                     const data = await response.json();
                     console.log('[DEBUG] JSON response:', data);
                     
-                    // Handle 3rd turn completion
+                    // Handle 3rd turn completion (reuse typing indicator)
                     if (data.status === 'third_turn_complete') {
                         console.log('[DEBUG] 3rd turn complete:', data.assessment);
-                        await handleThirdTurnCompletion(data);
+                        await handleThirdTurnCompletion(data, typingDiv);  // Pass typingDiv
                         return;
                     }
+                    
+                    // Remove typing indicator for other JSON responses
+                    typingDiv.remove();
                     
                     if (data.status === 'failed') {
                         // Pre-filter failure (profanity/gibberish)
@@ -1014,7 +1143,7 @@
                             console.log('[DEBUG] Extracted data:', data);
                             if (data) {
                                 agentResponse += data;
-                                agentContent.textContent = agentResponse;
+                                agentContent.textContent = cleanRolePrefix(agentResponse);
                                 console.log('[DEBUG] Current response length:', agentResponse.length);
                                 container.scrollTop = container.scrollHeight;
                             }
@@ -1027,7 +1156,7 @@
                     const data = buffer.substring(6);
                     if (data) {
                         agentResponse += data;
-                        agentContent.textContent = agentResponse;
+                        agentContent.textContent = cleanRolePrefix(agentResponse);
                     }
                 }
                 
@@ -1069,17 +1198,14 @@
             }
         }
         
-        async function handleThirdTurnCompletion(data) {
-            // Show Meno box with thinking ellipses
+        async function handleThirdTurnCompletion(data, existingTypingDiv) {
+            // Continue the typing indicator
             const container = document.getElementById('dialogue-container');
-            const thinkingDiv = document.createElement('div');
-            thinkingDiv.className = 'message agent';
-            thinkingDiv.innerHTML = '<div class="message-label">Meno</div><div class="message-content thinking-ellipses"><span></span><span></span><span></span></div>';
-            container.appendChild(thinkingDiv);
-            container.scrollTop = container.scrollHeight;
+            const thinkingDiv = existingTypingDiv;
             
+            // Get references to the existing elements
             const thinkingContent = thinkingDiv.querySelector('.message-content');
-            const ellipses = thinkingDiv.querySelector('.thinking-ellipses');
+            const ellipses = thinkingDiv.querySelector('.typing-indicator');
             
             // Wait a moment for effect
             await new Promise(resolve => setTimeout(resolve, 800));
@@ -1095,12 +1221,16 @@
                 // Turn box green
                 thinkingContent.classList.add('success');
 
-                // Remove the thinking-ellipses class to stop the pulse animation
-                ellipses.classList.remove('thinking-ellipses');
-
-                // Replace ellipses with checkmark
+                // Replace ellipses with checkmark (keeping them pulsing until replacement)
+                ellipses.classList.remove('typing-indicator');
                 ellipses.innerHTML = '<span class="checkmark">✓</span>';
                 
+                // Now remove the thinking-ellipses class
+                ellipses.classList.remove('thinking-ellipses');
+                
+                // Keep scroll at bottom as box height changes
+                container.scrollTop = container.scrollHeight;
+
                 // Wait for animation
                 await new Promise(resolve => setTimeout(resolve, 400));
                 
@@ -1133,14 +1263,30 @@
             
             const confidenceSlider = document.getElementById('final-confidence');
             const confidenceValue = document.getElementById('final-confidence-value');
+            const submitButton = document.getElementById('submit-final');
+            let finalConfidenceTimestamp = null;
+            let finalSliderHasBeenInteracted = false;
             
-            // Set to initial confidence as starting point
-            confidenceSlider.value = sessionData.student_initial_confidence || 50;
-            confidenceValue.textContent = confidenceSlider.value;
+            // Start with slider invisible and button disabled
+            submitButton.disabled = true;
             
             confidenceSlider.oninput = (e) => {
-                confidenceValue.textContent = e.target.value;
+                // On first interaction, make slider and value visible
+                if (!finalSliderHasBeenInteracted) {
+                    finalSliderHasBeenInteracted = true;
+                    confidenceSlider.classList.add('interacted');
+                    confidenceValue.parentElement.classList.add('visible');
+                    submitButton.disabled = false; // Enable submit button
+                }
+                
+                // Update value display and timestamp
+                confidenceValue.textContent = e.target.value + '/100';
+                e.target.setAttribute('aria-valuenow', e.target.value);
+                finalConfidenceTimestamp = new Date().toISOString();
             };
+            
+            // Store timestamp for submission
+            window.getFinalConfidenceTimestamp = () => finalConfidenceTimestamp;
             
             // Scroll to bottom to show the new confidence card
             window.scrollTo(0, document.body.scrollHeight);
@@ -1148,13 +1294,15 @@
         
         document.getElementById('submit-final').onclick = async () => {
             const confidence = document.getElementById('final-confidence').value;
+            const confidenceTimestamp = window.getFinalConfidenceTimestamp();
             
             try {
                 await fetch(`/api/session/${launchToken}/confidence`, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
-                        confidence: parseInt(confidence)
+                        confidence: parseInt(confidence),
+                        confidence_timestamp: confidenceTimestamp
                     })
                 });
                 
