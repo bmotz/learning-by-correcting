@@ -42,6 +42,20 @@ profanity.load_censor_words()
 # HELPER FUNCTIONS
 # ============================================================================
 
+def clean_llm_response(text: str) -> str:
+    """
+    Remove role prefixes that LLM sometimes includes in responses.
+    Examples: "Student: ", "Agent: ", "Meno: "
+    """
+    import re
+    
+    # Pattern matches "Student:", "Agent:", "Meno:" at the start (case-insensitive)
+    # Allows for optional whitespace and handles variations
+    pattern = r'^(Student|Agent|Meno)\s*:\s*'
+    cleaned = re.sub(pattern, '', text.strip(), flags=re.IGNORECASE)
+    
+    return cleaned.strip()
+
 def detect_gibberish(text: str) -> bool:
     """
     Detect if message is gibberish or spam.
@@ -210,10 +224,13 @@ def create_session(launch_token: str, params: Dict[str, Any], question: Dict[str
         "experiment_id": params.get("experiment_id"),
         "due_at": params.get("due_at"),
         "week": params.get("week"),
+        "is_demo": params.get("is_demo", False),
         "question": question,
         "student_initial_answer": None,
         "student_initial_confidence": None,
+        "student_initial_confidence_last_update": None,  # NEW: timestamp for initial confidence
         "student_final_confidence": None,
+        "student_final_confidence_last_update": None,  # NEW: timestamp for final confidence
         "dialogue": [],
         "agent_decision": None,
         "score": None,
@@ -334,7 +351,7 @@ async def request_feedback_summary(system_prompt: str, dialogue_history: list, q
                             continue
                 
                 # Clean up and return feedback
-                feedback = full_text.strip()
+                feedback = clean_llm_response(full_text)
                 print(f"[FEEDBACK RECEIVED] {feedback[:100]}...")
                 return feedback if feedback else "Thanks for helping me understand!"
                 
@@ -348,7 +365,7 @@ async def get_llm_response_non_streaming(system_prompt: str, dialogue_history: l
     Get LLM response without streaming (for 3rd turn MR3 generation).
     Returns the complete response text.
     """
-    # Build message for LLM
+    # Build conversation
     conversation = ""
     for turn in dialogue_history:
         if turn["role"] == "student":
@@ -365,16 +382,16 @@ async def get_llm_response_non_streaming(system_prompt: str, dialogue_history: l
         "max_tokens": config.LLM_MAX_TOKENS
     }
     
-    print(f"\n[LLM NON-STREAMING] Requesting MR3...")
+    print(f"\n[MR3 REQUEST] Getting Meno's response...")
     
+    # Non-streaming request
     timeout = aiohttp.ClientTimeout(total=config.LLM_TIMEOUT)
     
     try:
         async with aiohttp.ClientSession(timeout=timeout) as session:
             async with session.post(config.LLM_ENDPOINT, json=payload) as response:
                 if response.status != 200:
-                    print(f"[LLM ERROR] Server error: {response.status}")
-                    raise Exception("LLM server error")
+                    raise Exception(f"LLM server error: {response.status}")
                 
                 # Collect full response
                 full_text = ""
@@ -388,14 +405,14 @@ async def get_llm_response_non_streaming(system_prompt: str, dialogue_history: l
                                 chunk_data = json.loads(line_str)
                                 if chunk_data.get("type") == "content" and "text" in chunk_data:
                                     full_text += chunk_data["text"]
-                        except (json.JSONDecodeError, Exception):
+                        except (json.JSONDecodeError, Exception) as e:
                             continue
                 
-                print(f"[LLM NON-STREAMING] Received {len(full_text)} chars")
+                print(f"[MR3 RECEIVED] {full_text[:100]}...")
                 return full_text.strip()
                 
     except Exception as e:
-        print(f"[LLM ERROR] {e}")
+        print(f"[MR3 ERROR] {e}")
         raise
 
 
@@ -542,7 +559,7 @@ async def handle_third_turn_completion(launch_token: str, session_data: Dict[str
         # Save MR3 to dialogue
         session_data["dialogue"].append({
             "role": "agent",
-            "message": mr3_text,
+            "message": clean_llm_response(mr3_text),
             "timestamp": datetime.now().isoformat()
         })
         
@@ -628,16 +645,16 @@ async def index(request: Request):
     # Extract launch parameters
     launch_token = request.query_params.get("launch_token")
     
-    # If no launch token, generate a demo token and redirect
+    # If no launch token, generate demo token and redirect
     if not launch_token:
-        import uuid
-        demo_token = f"demo_{uuid.uuid4()}"
+        # Use fixed demo token instead of UUID
+        demo_token = config.DEMO_SESSION_TOKEN
         # Redirect to self with demo token
         redirect_url = f"/lbc/?launch_token={demo_token}&condition_name=ODD&anonymous_id=demo_user&assignment_id=test_assignment"
         return RedirectResponse(url=redirect_url, status_code=302)
     
     # Now we definitely have a launch token
-    is_demo = launch_token.startswith("demo_") or (launch_token == config.PREVIEW_TOKEN)
+    is_demo = (launch_token == config.DEMO_SESSION_TOKEN) or (launch_token == config.PREVIEW_TOKEN)
     
     # Extract other parameters with defaults for demo mode
     params = {
@@ -679,11 +696,11 @@ async def index(request: Request):
             import random
             question = random.choice(available)
             
-            # Mark question as used (unless demo)
+            # Mark question as used (even in demo mode for tracking, but won't prevent reuse)
             if not is_demo:
                 mark_question_used(params["anonymous_id"], week, question["id"], launch_token)
             
-            # Create session
+            # Create session (now recording demo data)
             create_session(launch_token, params, question)
             
         except Exception as e:
@@ -733,6 +750,7 @@ async def submit_initial_answer(launch_token: str, request: Request):
     
     session_data["student_initial_answer"] = body.get("answer")
     session_data["student_initial_confidence"] = body.get("confidence")
+    session_data["student_initial_confidence_last_update"] = body.get("confidence_timestamp")  # NEW
     
     # Generate Meno's opening message based on student's answer
     meno_opening = generate_meno_opening(
@@ -899,13 +917,13 @@ async def send_message(launch_token: str, request: Request):
                 "feedback": f"Student was unable to provide helpful explanations after Meno expressed confusion"
             }
             session_data["score"] = config.FAIL_SCORE
+            session_data["frustration_count"] += 1  # Count this as second frustration
             save_session(session_data)
             
-            # Return JSON response that tells frontend to skip confidence
             return JSONResponse(content={
                 "status": "failed",
-                "reason": "insufficient_help",  
-                "message": "Dialogue ended - student was unable to provide helpful explanations",
+                "reason": fail_reason,
+                "message": "Dialogue ended due to continued unhelpful responses",
                 "score": config.FAIL_SCORE,
                 "skip_confidence": True
             })
@@ -975,7 +993,7 @@ async def send_message(launch_token: str, request: Request):
                 session_data_updated["llm_failure_recovery"] = True
                 session_data_updated["dialogue"].append({
                     "role": "agent",
-                    "message": accumulated_text,
+                    "message": clean_llm_response(accumulated_text),
                     "timestamp": datetime.now().isoformat()
                 })
                 save_session(session_data_updated)
@@ -985,7 +1003,7 @@ async def send_message(launch_token: str, request: Request):
             # Save agent response
             session_data_updated["dialogue"].append({
                 "role": "agent",
-                "message": accumulated_text,
+                "message": clean_llm_response(accumulated_text),
                 "timestamp": datetime.now().isoformat()
             })
             
@@ -1035,6 +1053,7 @@ async def submit_final_confidence(launch_token: str, request: Request):
     
     body = await request.json()
     session_data["student_final_confidence"] = body.get("confidence")
+    session_data["student_final_confidence_last_update"] = body.get("confidence_timestamp")  # NEW
     
     save_session(session_data)
     
@@ -1050,13 +1069,12 @@ async def complete_dialogue(launch_token: str):
         raise HTTPException(status_code=404, detail="Session not found")
     
     # Check if demo mode
-    is_demo = session_data.get("is_demo", False) or launch_token.startswith("demo_")
+    is_demo = session_data.get("is_demo", False) or (launch_token == config.DEMO_SESSION_TOKEN)
     
     if is_demo:
-        # Demo mode - just delete session, don't save to completed
-        session_file = config.SESSIONS_DIR / f"{launch_token}.json"
-        if session_file.exists():
-            session_file.unlink()
+        # Demo mode - move to completed (will overwrite previous demo_session.json)
+        # This ensures demo data is recorded but always overwrites
+        complete_session(session_data)
         
         # Return a demo completion URL (just reload the page)
         return {"redirect_url": "/?demo_complete=true"}

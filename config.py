@@ -6,7 +6,7 @@ from pathlib import Path
 
 # Base paths
 BASE_DIR = Path(__file__).parent
-DATA_DIR = BASE_DIR / "data"
+DATA_DIR = Path("/mnt/changelab_data/lbc")
 SESSIONS_DIR = DATA_DIR / "sessions"
 COMPLETED_DIR = DATA_DIR / "completed"
 TRACKING_DIR = DATA_DIR / "tracking"
@@ -24,6 +24,9 @@ LLM_MAX_TOKENS = 500  # per response
 # Terracotta Configuration
 TERRACOTTA_RETURN_URL = "https://app.terracotta.education/integrations"
 PREVIEW_TOKEN = "00000000-0000-4000-B000-000000000000"
+
+# Demo Configuration
+DEMO_SESSION_TOKEN = "demo_session"  # Fixed token for all demo sessions
 
 # Assignment to Week Mapping (to be configured after Terracotta setup)
 # This maps assignment_id to week number
