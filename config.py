@@ -10,6 +10,7 @@ DATA_DIR = Path("/mnt/changelab_data/lbc")
 SESSIONS_DIR = DATA_DIR / "sessions"
 COMPLETED_DIR = DATA_DIR / "completed"
 TRACKING_DIR = DATA_DIR / "tracking"
+FAILURES_DIR = DATA_DIR / "failures"
 QUESTION_BANKS_DIR = BASE_DIR / "question_banks"
 
 # Ensure directories exist
@@ -33,6 +34,9 @@ DEMO_SESSION_TOKEN = "demo_session"  # Fixed token for all demo sessions
 ASSIGNMENT_MAPPING = {
     # Will be populated when instructor creates assignments in Terracotta
     # Example: "78": 1, "79": 2, ...
+    "18630284": 1,
+    "18630293": 2,
+    "18630294": 3,
     "test_assignment": 1  # For development/testing
 }
 
@@ -42,6 +46,7 @@ MAX_TURNS = 3  # Easily configurable - can be changed to 4+ turns
 MIN_EXPLANATION_LENGTH = 10  # Minimum words for LLM failure recovery
 MIN_MESSAGE_LENGTH = 10  # Minimum words to avoid gibberish
 PROFANITY_CHECK = True
+PROFANITY_THRESHOLD = 0.80 # 80% certainty
 COPY_PASTE_THRESHOLD = 0.85  # Similarity threshold for copy-paste detection
 
 # Frustration Detection Configuration
@@ -50,9 +55,12 @@ FRUSTRATION_MARKERS = [
     "back on track", "not making sense", "not addressing",
     "doesn't help me understand", "confused by your response",
     "that doesn't answer my question", "i'm still lost",
+    "i apologize", "sorry about that", "i'm sorry",
+    "i'm not sure what you're trying to say",
     # Redirection attempts
     "let's focus on", "returning to", "but about the question",
     "what i need to understand is", "getting back to",
+    "try to help you again",
     # Confusion escalation
     "i don't see how that relates", "that seems off-topic",
     "i'm having trouble following", "wait, what",
@@ -68,7 +76,11 @@ FRUSTRATION_MARKERS = [
     "what's going on here", "a bit of a miscommunication",
     "can we please refocus", "the topic at hand",
     "Oh no, not again!", "you're acting like",
-    "you're still acting like"
+    "you're still acting like", "i'm still trying to help you",
+    "a bit of a miscommunication", "i'm here to help", 
+    "getting a bit sidetracked", "getting sidetracked",
+    "a bit off-topic", "i'm just trying to help",
+    "stay on topic", 
 ]
 
 # Grading Configuration
@@ -134,5 +146,37 @@ CRITICAL REMINDERS:
 
 # Frontend Configuration
 DIALOGUE_FRAMING_TEMPLATE = """The correct answer is {correct_answer}. You initially chose {student_answer}, which is the same misconception the agent has. Now teach the agent why that reasoning is mistaken."""
-
 DIALOGUE_FRAMING_DIFFERENT = """The correct answer is {correct_answer}. You initially chose {student_answer}, but the agent chose {misconception_answer}. Teach the agent why their misconception is wrong."""
+
+# Condition Configuration
+DIALOGUE_CONDITION_NAME = "dialogue"  # Condition name for dialogue with Meno
+CONTROL_CONDITION_NAME = "control"    # Condition name for self-explanation
+DEFAULT_CONDITION = "dialogue"        # Default if no condition_name provided
+
+# Self-Explanation Configuration
+SCORING_ENDPOINT = "https://rutherford.college.indiana.edu/llmscoring/summary/confidence"
+SCORING_TIMEOUT = 30  # seconds
+MIN_EXPLANATION_WORDS = 24  # Minimum words required for explanation
+
+# Scoring Thresholds
+DIMENSION_WEIGHTS = {
+    "Excellent": 1.0,
+    "Good": 0.75,
+    "Fair": 0.25,
+    "Poor": 0.0
+}
+
+# Dimensions to evaluate (order matters for display)
+SCORING_DIMENSIONS = ["Main Idea", "Details", "Wording"]
+
+# Feedback messages for failing dimensions
+DIMENSION_FEEDBACK = {
+    "Main Idea": "Explain why this answer is correct and not the others",
+    "Details": "Include more details about the key concepts involved",
+    "Wording": "Rephrase your explanation more clearly"
+}
+
+# Dot product thresholds
+DOT_PRODUCT_PASS = 0.7
+DOT_PRODUCT_CONDITIONAL = 0.5
+CONFIDENCE_THRESHOLD = 0.5

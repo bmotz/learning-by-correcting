@@ -6,6 +6,8 @@ import asyncio
 import json
 import re
 import time
+import numpy as np
+import random
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, Dict, Any
@@ -16,7 +18,7 @@ from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import HTMLResponse, StreamingResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-from better_profanity import profanity
+from profanity_check import predict, predict_prob
 
 import config
 
@@ -34,12 +36,112 @@ app.add_middleware(
 # Mount static files
 app.mount("/static", StaticFiles(directory=str(config.BASE_DIR / "static")), name="static")
 
-# Initialize profanity filter
-profanity.load_censor_words()
+# ============================================================================
+# SELF-EXPLANATION SCORING FUNCTIONS
+# ============================================================================
 
+def calculate_dot_product(score_probabilities: Dict[str, float]) -> float:
+    """
+    Calculate dot product for a dimension using configured weights.
+    """
+    dot_product = 0.0
+    for score_label, weight in config.DIMENSION_WEIGHTS.items():
+        probability = score_probabilities.get(score_label, 0.0)
+        dot_product += weight * probability
+    return dot_product
+
+
+def evaluate_dimension(dimension_data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Evaluate if a single dimension passes based on dot product and confidence.
+    Returns dict with pass status, dot product, and reason.
+    """
+    score_probs = dimension_data.get("score_probabilities", {})
+    dot_product = calculate_dot_product(score_probs)
+    confidence = dimension_data.get("confidence", 0.0)
+    predicted_score = dimension_data.get("predicted_score", "")
+    
+    result = {
+        "dot_product": round(dot_product, 3),
+        "confidence": round(confidence, 3),
+        "predicted_score": predicted_score,
+        "passed": False,
+        "reason": ""
+    }
+    
+    if dot_product >= config.DOT_PRODUCT_PASS:
+        result["passed"] = True
+        result["reason"] = "strong"
+    elif dot_product >= config.DOT_PRODUCT_CONDITIONAL:
+        # Conditional pass based on confidence
+        if confidence > config.CONFIDENCE_THRESHOLD:
+            # High confidence - need Good or Excellent
+            if predicted_score in ["Good", "Excellent"]:
+                result["passed"] = True
+                result["reason"] = "good_score"
+            else:
+                result["reason"] = "needs_better_score"
+        else:
+            # Low confidence - lenient pass
+            result["passed"] = True
+            result["reason"] = "low_confidence_pass"
+    else:
+        result["reason"] = "low_dot_product"
+    
+    return result
+
+
+async def call_scoring_api(student_response: str, context: str) -> Optional[Dict]:
+    """
+    Call the scoring LLM API and return the parsed response.
+    """
+    payload = {
+        "context": context,
+        "question": 'Please explain the correct answer',
+        "student_response": student_response
+    }
+    
+    try:
+        timeout = aiohttp.ClientTimeout(total=config.SCORING_TIMEOUT)
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with session.post(
+                config.SCORING_ENDPOINT, 
+                json=payload,
+                headers={'Content-Type': 'application/json'}
+            ) as response:
+                if response.status == 200:
+                    return await response.json()
+                else:
+                    print(f"[SCORING_API] Error: Status {response.status}")
+                    return None
+    except asyncio.TimeoutError:
+        print(f"[SCORING_API] Timeout after {config.SCORING_TIMEOUT}s")
+        return None
+    except Exception as e:
+        print(f"[SCORING_API] Error: {str(e)}")
+        return None
+
+
+def build_scoring_context(session_data: Dict) -> str:
+    """
+    Build context string for scoring API from session data.
+    """
+    question = session_data["question"]
+    correct_answer = question["correct_answer"]
+    student_initial = session_data.get("student_initial_answer", "")
+    question_text = question["question_text"]
+    
+    # Build context matching the format discussed
+    context = (
+        f"Question: {question_text} "
+        f"The student initially chose {student_initial}."
+        f"The correct answer is {correct_answer}. "
+    )
+    
+    return context
 
 # ============================================================================
-# HELPER FUNCTIONS
+# DIALOGUE FUNCTIONS
 # ============================================================================
 
 def clean_llm_response(text: str) -> str:
@@ -55,6 +157,7 @@ def clean_llm_response(text: str) -> str:
     cleaned = re.sub(pattern, '', text.strip(), flags=re.IGNORECASE)
     
     return cleaned.strip()
+
 
 def detect_gibberish(text: str) -> bool:
     """
@@ -102,7 +205,7 @@ def pre_filter_check(message: str) -> Optional[str]:
     Returns failure reason if detected, None if clean.
     """
     # Check profanity first
-    if config.PROFANITY_CHECK and profanity.contains_profanity(message):
+    if config.PROFANITY_CHECK and predict_prob([message])[0] > config.PROFANITY_THRESHOLD:
         print(f"[PRE-FILTER] Profanity detected in message")
         return "inappropriate_language"
     
@@ -159,6 +262,29 @@ def check_llm_failure_explanation(message: str) -> bool:
     return False
 
 
+def archive_failed_session(session_data: Dict[str, Any]):
+    """
+    Saves a copy of the failed session for research analysis
+    before the main session is reset for a retry.
+    """
+    try:
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        
+        # Ensure the directory exists (idempotent)
+        config.FAILURES_DIR.mkdir(exist_ok=True)
+        
+        filename = f"{session_data['anonymous_id']}_{session_data['launch_token']}_fail_{timestamp}.json"
+        
+        # Write to the failures directory
+        with open(config.FAILURES_DIR / filename, "w") as f:
+            json.dump(session_data, f, indent=2)
+            
+        print(f"[ARCHIVE] Failed attempt saved to {filename}")
+        
+    except Exception as e:
+        print(f"[ERROR] Failed to archive session: {str(e)}")
+
+
 def load_question_bank(week: int) -> Dict[str, Any]:
     """Load question bank for specified week"""
     file_path = config.QUESTION_BANKS_DIR / f"week_{week}.json"
@@ -173,8 +299,8 @@ def get_available_questions(week: int, condition: str, anonymous_id: str) -> lis
     """Get questions not yet used by this student this week"""
     question_bank = load_question_bank(week)
     
-    # Filter by condition
-    available = [q for q in question_bank["questions"] if q["condition"] == condition]
+    # Start with all questions (condition doesn't filter question pool)
+    available = question_bank["questions"]
     
     # Load tracking file to see which questions student has used
     tracking_file = config.TRACKING_DIR / f"{anonymous_id}_week_{week}.json"
@@ -450,42 +576,63 @@ def generate_meno_opening(question: Dict[str, Any], student_answer: str) -> str:
 
 
 async def stream_llm_response(system_prompt: str, dialogue_history: list, student_message: str):
-    """Stream response from LLM server"""
-    # Build message for LLM
-    conversation = ""
+    """Stream response from LLM server using structured messages (Standard Llama 3 format)"""
+    
+    # 1. Construct the strict message list
+    # This replaces the string concatenation approach to prevent 'leaks'
+    messages_payload = []
+
+    # Add System Prompt first
+    if system_prompt:
+        messages_payload.append({
+            "role": "system", 
+            "content": system_prompt
+        })
+
+    # Add History
     for turn in dialogue_history:
-        if turn["role"] == "student":
-            conversation += f"Student: {turn['message']}\n\n"
-        else:
-            conversation += f"Agent: {turn['message']}\n\n"
+        # Map internal app roles to LLM roles
+        # 'agent' -> 'assistant', 'student' -> 'user'
+        role = "assistant" if turn['role'] == "agent" else "user"
+        messages_payload.append({
+            "role": role,
+            "content": turn['message']
+        })
     
-    conversation += f"Student: {student_message}\n\nAgent: "
+    # Add the LATEST user message
+    messages_payload.append({
+        "role": "user",
+        "content": student_message
+    })
     
-    # Prepare request
+    # 2. Prepare request payload
+    # Note: We now send 'messages' (list) instead of 'message' (string)
     payload = {
-        "message": conversation,
-        "system_prompt": system_prompt,
-        "max_tokens": config.LLM_MAX_TOKENS
+        "messages": messages_payload,
+        "max_tokens": config.LLM_MAX_TOKENS,
+        "temperature": 0.7 
     }
 
-    # ADD THIS LOGGING
+    # 3. Updated Logging for Debugging
     print(f"\n{'='*60}")
-    print(f"SENDING TO LLM SERVER:")
-    print(f"System prompt length: {len(system_prompt)} chars")
-    print(f"Conversation length: {len(conversation)} chars")
-    print(f"Conversation:\n{conversation}")
-    print(f"Payload: {json.dumps(payload, indent=2)[:500]}")
+    print(f"SENDING TO LLM SERVER (Structured List):")
+    print(f"Total messages: {len(messages_payload)}")
+    print(f"Payload Preview:\n{json.dumps(payload, indent=2)}") 
     print(f"{'='*60}\n")
     
-    # Stream from LLM
+    # 4. Stream from LLM
     timeout = aiohttp.ClientTimeout(total=config.LLM_TIMEOUT)
     
     try:
         async with aiohttp.ClientSession(timeout=timeout) as session:
+            # Post to Rutherford
             async with session.post(config.LLM_ENDPOINT, json=payload) as response:
+                
                 if response.status != 200:
                     print(f"[DEBUG] LLM server error: {response.status}")
-                    yield f"data: {json.dumps({'error': 'LLM server error'})}\n\n"
+                    error_text = await response.text()
+                    print(f"[DEBUG] Error details: {error_text}")
+                    yield f"data: {json.dumps({'error': f'LLM server error {response.status}'})}\n\n"
                     return
                 
                 # Handle JSON streaming format
@@ -495,23 +642,33 @@ async def stream_llm_response(system_prompt: str, dialogue_history: list, studen
                         try:
                             # Decode the line
                             line_str = line.decode('utf-8').strip()
+                            
                             if line_str:
-                                
-                                # Remove 'data: ' prefix if present
+                                # Remove 'data: ' prefix if present (SSE standard)
                                 if line_str.startswith('data: '):
-                                    line_str = line_str[6:]  # Remove 'data: '
+                                    line_str = line_str[6:]
                                 
-                                if line_str:  # Check again after stripping prefix
+                                # Check for empty lines or standard SSE 'DONE' messages
+                                if line_str and line_str != '[DONE]': 
                                     # Parse JSON chunk
                                     chunk_data = json.loads(line_str)
-                                
-                                # Extract text if present
-                                if chunk_data.get("type") == "content" and "text" in chunk_data:
-                                    text_chunk = chunk_data["text"]
-                                    full_text += text_chunk
-                                    # Send as SSE format
-                                    sse_line = f"data: {text_chunk}\n\n"
-                                    yield sse_line.encode('utf-8')
+                                    
+                                    # Handle server-side errors reported in the stream
+                                    if chunk_data.get("type") == "error":
+                                        print(f"[DEBUG] Server streaming error: {chunk_data.get('error')}")
+                                        yield f"data: {json.dumps(chunk_data)}\n\n"
+                                        continue
+
+                                    # Extract text if present
+                                    if chunk_data.get("type") == "content" and "text" in chunk_data:
+                                        text_chunk = chunk_data["text"]
+                                        full_text += text_chunk
+                                        
+                                        # Send as SSE format to frontend
+                                        # Note: Yielding strings is safer than mixing bytes/strings
+                                        sse_line = f"data: {text_chunk}\n\n"
+                                        yield sse_line
+                                        
                         except json.JSONDecodeError as e:
                             print(f"[DEBUG] JSON decode error: {e}")
                             continue
@@ -523,10 +680,10 @@ async def stream_llm_response(system_prompt: str, dialogue_history: list, studen
                             
     except asyncio.TimeoutError:
         print(f"[DEBUG] LLM timeout")
-        yield f"data: {json.dumps({'error': 'LLM timeout'})}\n\n".encode('utf-8')
+        yield f"data: {json.dumps({'error': 'LLM timeout'})}\n\n"
     except Exception as e:
         print(f"[DEBUG] Exception: {e}")
-        yield f"data: {json.dumps({'error': str(e)})}\n\n".encode('utf-8')
+        yield f"data: {json.dumps({'error': str(e)})}\n\n"
 
 
 async def handle_third_turn_completion(launch_token: str, session_data: Dict[str, Any]) -> JSONResponse:
@@ -639,104 +796,247 @@ async def handle_third_turn_completion(launch_token: str, session_data: Dict[str
 # API ENDPOINTS
 # ============================================================================
 
-@app.get("/", response_class=HTMLResponse)
-async def index(request: Request):
-    """Main entry point - handles Terracotta launch"""
-    # Extract launch parameters
-    launch_token = request.query_params.get("launch_token")
-    
-    # If no launch token, generate demo token and redirect
-    if not launch_token:
-        # Use fixed demo token instead of UUID
-        demo_token = config.DEMO_SESSION_TOKEN
-        # Redirect to self with demo token
-        redirect_url = f"/lbc/?launch_token={demo_token}&condition_name=ODD&anonymous_id=demo_user&assignment_id=test_assignment"
-        return RedirectResponse(url=redirect_url, status_code=302)
-    
-    # Now we definitely have a launch token
-    is_demo = (launch_token == config.DEMO_SESSION_TOKEN) or (launch_token == config.PREVIEW_TOKEN)
-    
-    # Extract other parameters with defaults for demo mode
-    params = {
-        "launch_token": launch_token,
-        "anonymous_id": request.query_params.get("anonymous_id", "demo_user"),
-        "assignment_id": request.query_params.get("assignment_id", "test_assignment"),
-        "submission_id": request.query_params.get("submission_id"),
-        "condition_name": request.query_params.get("condition_name", "ODD"),
-        "experiment_id": request.query_params.get("experiment_id"),
-        "due_at": request.query_params.get("due_at"),
-        "remaining_attempts": request.query_params.get("remaining_attempts"),
-        "is_demo": is_demo
-    }
-    
-    # Map assignment_id to week
-    week = config.ASSIGNMENT_MAPPING.get(params["assignment_id"], 1)  # Default to week 1
-    params["week"] = week
-    
-    # Check if session already exists
-    existing_session = load_session(launch_token)
-    if existing_session:
-        # Session exists, serve interface
-        pass
-    else:
-        # Create new session
-        try:
-            # Get available questions
-            available = get_available_questions(week, params["condition_name"], params["anonymous_id"])
-            
-            if not available:
-                # In demo mode, allow reuse of questions
-                if is_demo:
-                    question_bank = load_question_bank(week)
-                    available = [q for q in question_bank["questions"] if q["condition"] == params["condition_name"]]
-                else:
-                    return HTMLResponse(content="<h1>No Questions Available</h1><p>You have already completed all available questions for this week.</p>", status_code=400)
-            
-            # Select random question
-            import random
-            question = random.choice(available)
-            
-            # Mark question as used (even in demo mode for tracking, but won't prevent reuse)
-            if not is_demo:
-                mark_question_used(params["anonymous_id"], week, question["id"], launch_token)
-            
-            # Create session (now recording demo data)
-            create_session(launch_token, params, question)
-            
-        except Exception as e:
-            return HTMLResponse(content=f"<h1>Error</h1><p>{str(e)}</p>", status_code=500)
-    
-    # Serve the frontend
-    html_file = config.BASE_DIR / "templates" / "index.html"
-    if not html_file.exists():
-        return HTMLResponse(content="<h1>Error: Frontend not found</h1>", status_code=500)
-    
-    with open(html_file, 'r') as f:
-        html_content = f.read()
-    
-    return HTMLResponse(content=html_content)
-
-
-@app.get("/api/session/{launch_token}")
-async def get_session(launch_token: str):
-    """Get session data"""
+@app.post("/api/session/{launch_token}/evaluate_explanation")
+async def evaluate_explanation(launch_token: str, request: Request):
+    """
+    Evaluate student's self-explanation using the scoring LLM.
+    """
     session_data = load_session(launch_token)
     
     if not session_data:
         raise HTTPException(status_code=404, detail="Session not found")
     
-    # Return safe subset for frontend
+    body = await request.json()
+    explanation = body.get("explanation", "").strip()
+    
+    # Check word count
+    word_count = len(explanation.split())
+    if word_count < config.MIN_EXPLANATION_WORDS:
+        return {
+            "status": "error",
+            "error_type": "word_count",
+            "word_count": word_count,
+            "required": config.MIN_EXPLANATION_WORDS,
+            "message": f"Please provide at least {config.MIN_EXPLANATION_WORDS} words"
+        }
+    
+    # Build context and call scoring API
+    context = build_scoring_context(session_data)
+    scoring_response = await call_scoring_api(explanation, context)
+    
+    if not scoring_response:
+        # API failed
+        return {
+            "status": "error",
+            "error_type": "api_failure",
+            "message": "An error occurred while evaluating your explanation. Please contact your instructor."
+        }
+    
+    # Evaluate each dimension
+    evaluation_results = {}
+    all_passed = True
+    failing_dimensions = []
+
+    for dimension in config.SCORING_DIMENSIONS:
+        if dimension in scoring_response.get("confidences", {}):
+            dim_data = scoring_response["confidences"][dimension]
+            eval_result = evaluate_dimension(dim_data)
+            evaluation_results[dimension] = eval_result
+            
+            if not eval_result["passed"]:
+                all_passed = False
+                failing_dimensions.append(dimension)
+        else:
+            # Dimension missing from API - treat as pass but mark as unavailable
+            evaluation_results[dimension] = {
+                "dot_product": None,  # Use None to indicate N/A
+                "confidence": None,
+                "predicted_score": "N/A",
+                "passed": True,  # Don't penalize for missing data
+                "reason": "not_evaluated"
+            }
+        
+    # Record attempt in session
+    if "explanation_attempts" not in session_data:
+        session_data["explanation_attempts"] = []
+    
+    attempt_data = {
+        "text": explanation,
+        "word_count": word_count,
+        "timestamp": datetime.now().isoformat(),
+        "raw_scores": scoring_response.get("scores", {}),
+        "confidences": scoring_response.get("confidences", {}),
+        "evaluation": evaluation_results,
+        "passed": all_passed,
+        "attempt_number": len(session_data["explanation_attempts"]) + 1
+    }
+    
+    session_data["explanation_attempts"].append(attempt_data)
+    
+    # If passed, set decision and score
+    if all_passed:
+        session_data["agent_decision"] = {
+            "assessment": "PASS",
+            "feedback": "Your explanation demonstrated understanding of the concept"
+        }
+        session_data["score"] = config.PASS_SCORE
+    
+    save_session(session_data)
+    
+    # Build response with feedback
+    feedback_messages = []
+    for dim in failing_dimensions:
+        feedback_messages.append(config.DIMENSION_FEEDBACK.get(dim, f"Improve {dim}"))
+    
     return {
-        "launch_token": launch_token,
-        "week": session_data["week"],
-        "question": session_data["question"],
-        "student_initial_answer": session_data["student_initial_answer"],
-        "student_initial_confidence": session_data["student_initial_confidence"],
-        "dialogue": session_data["dialogue"],
-        "agent_decision": session_data["agent_decision"],
-        "completed": session_data.get("completed_at") is not None
+        "status": "success",
+        "passed": all_passed,
+        "evaluation": evaluation_results,
+        "feedback": feedback_messages if not all_passed else [],
+        "attempt_number": len(session_data["explanation_attempts"])
     }
 
+@app.get("/", response_class=HTMLResponse)
+async def index(request: Request):
+    """Main entry point - handles both direct access and Terracotta launches"""
+    
+    # Get parameters from URL
+    launch_token = request.query_params.get("launch_token")
+    anonymous_id = request.query_params.get("anonymous_id")
+    assignment_id = request.query_params.get("assignment_id")
+    condition_name = request.query_params.get("condition_name", config.DEFAULT_CONDITION)
+    
+    # Validate condition name
+    valid_conditions = [config.DIALOGUE_CONDITION_NAME, config.CONTROL_CONDITION_NAME]
+    if condition_name not in valid_conditions:
+        print(f"[LAUNCH] Unknown condition '{condition_name}', defaulting to {config.DEFAULT_CONDITION}")
+        condition_name = config.DEFAULT_CONDITION
+    
+    # Check if this is a Terracotta launch or direct access
+    if not launch_token:
+        # Demo mode
+        print("[LAUNCH] No launch token - starting demo mode")
+        launch_token = config.DEMO_SESSION_TOKEN
+        
+        # Redirect with demo token and condition
+        return RedirectResponse(
+            url=f"/lbc/?launch_token={launch_token}&condition_name={condition_name}", 
+            status_code=303
+        )
+    
+    # Real launch from Terracotta
+    print(f"[LAUNCH] Terracotta launch: token={launch_token}, condition={condition_name}")
+    
+    # Check whether this is a demo mode launch 
+    is_demo = (launch_token == config.DEMO_SESSION_TOKEN) or (launch_token == config.PREVIEW_TOKEN)
+
+    # Check for existing session
+    session_data = load_session(launch_token)
+    
+    # FORCE NEW SESSION for Preview/Demo tokens
+    if launch_token == config.PREVIEW_TOKEN or launch_token == config.DEMO_SESSION_TOKEN:
+        print(f"[LAUNCH] Preview/Demo token detected. Forcing new session.")
+        session_data = None  # This forces the 'else' block, below, to run
+    
+    if session_data:
+        print(f"[LAUNCH] Existing session found")
+        # Update condition if changed
+        if session_data.get("condition") != condition_name:
+            print(f"[LAUNCH] Updating condition from {session_data.get('condition')} to {condition_name}")
+            session_data["condition"] = condition_name
+            save_session(session_data)
+    else:
+        # New session
+        print(f"[LAUNCH] Creating new session")
+        
+        # Extract other parameters with defaults for demo mode
+        params = {
+            "launch_token": launch_token,
+            "anonymous_id": request.query_params.get("anonymous_id", "demo_user"),
+            "assignment_id": request.query_params.get("assignment_id", "test_assignment"),
+            "submission_id": request.query_params.get("submission_id"),
+            "condition_name": request.query_params.get("condition_name", "dialogue"),
+            "experiment_id": request.query_params.get("experiment_id"),
+            "due_at": request.query_params.get("due_at"),
+            "remaining_attempts": request.query_params.get("remaining_attempts"),
+            "is_demo": is_demo
+        }
+        
+        # Map assignment_id to week
+        week = config.ASSIGNMENT_MAPPING.get(params["assignment_id"], 1)  # Default to week 1
+        params["week"] = week
+
+        # Initialize session_data 
+        session_data = {
+            "launch_token": launch_token,
+            "anonymous_id": params["anonymous_id"],
+            "assignment_id": params["assignment_id"],
+            "is_demo": params["is_demo"],
+            "week": params["week"],
+            "condition": params["condition_name"],  
+            "created_at": datetime.now().isoformat(),
+            "dialogue": [],  # Initialize empty dialogue
+            "explanation_attempts": [],  # For control condition
+            "frustration_count": 0,
+            "safety_violations": [],
+            "student_initial_answer": None,
+            "student_initial_confidence": None,
+            "student_final_confidence": None,
+            "question": None,
+            "agent_decision": None,
+            "score": None
+        }
+
+        try:
+            # Get available questions
+            available = get_available_questions(week, condition_name, params["anonymous_id"])
+            
+            if not available:
+                if is_demo:
+                    question_bank = load_question_bank(week)
+                    available = question_bank["questions"]
+                else:
+                    return HTMLResponse(content="<h1>No Questions Available</h1><p>You have already completed all available questions for this week.</p>", status_code=400)
+            
+            # Select random question
+            question = random.choice(available)
+            
+            if not is_demo:
+                mark_question_used(anonymous_id, week, question["id"], launch_token)
+            
+            # Update session_data with the result from create_session
+            session_data = create_session(launch_token, params, question)
+            
+        except Exception as e:
+            import traceback
+            traceback.print_exc() # Print error to server logs
+            return HTMLResponse(content=f"<h1>Error</h1><p>{str(e)}</p>", status_code=500)        
+
+        # Now when we save, we are saving the data that has the question
+        save_session(session_data)
+    
+    # Load and return the index.html file
+    with open(config.BASE_DIR / "templates/index.html", "r") as f:
+        html_content = f.read()
+    
+    return HTMLResponse(content=html_content)
+
+@app.get("/api/session/{launch_token}")
+async def get_session(launch_token: str):
+    """Get session data"""
+    try:
+        session_data = load_session(launch_token)
+        
+        if not session_data:
+            print(f"[SESSION] No session found for token: {launch_token}")
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        print(f"[SESSION] Loaded session for token: {launch_token}, condition: {session_data.get('condition', 'unknown')}")
+        return session_data
+    
+    except Exception as e:
+        print(f"[SESSION ERROR] Failed to load session: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/session/{launch_token}/initial")
 async def submit_initial_answer(launch_token: str, request: Request):
@@ -1059,6 +1359,14 @@ async def submit_final_confidence(launch_token: str, request: Request):
     
     return {"status": "success"}
 
+@app.get("/api/config")
+async def get_config():
+    """Provide necessary config values to frontend"""
+    return {
+        "MIN_EXPLANATION_WORDS": config.MIN_EXPLANATION_WORDS,
+        "DIALOGUE_CONDITION_NAME": config.DIALOGUE_CONDITION_NAME,
+        "CONTROL_CONDITION_NAME": config.CONTROL_CONDITION_NAME
+    }
 
 @app.post("/api/session/{launch_token}/complete")
 async def complete_dialogue(launch_token: str):
@@ -1067,22 +1375,55 @@ async def complete_dialogue(launch_token: str):
     
     if not session_data:
         raise HTTPException(status_code=404, detail="Session not found")
-    
-    # Check if demo mode
-    is_demo = session_data.get("is_demo", False) or (launch_token == config.DEMO_SESSION_TOKEN)
-    
-    if is_demo:
-        # Demo mode - move to completed (will overwrite previous demo_session.json)
-        # This ensures demo data is recorded but always overwrites
+
+    # DETERMINE PASS/FAIL LOGIC
+    # logic: Fail if score is 0 (which implies frustration/safety violation or very poor performance)
+    # Adjust this threshold if you want a stricter passing grade (e.g. score < 0.6)
+    current_score = session_data.get("score", 0)
+    is_passing = current_score > 0 
+
+    if not is_passing:
+        # --- FAIL STATE: RETRY LOOP ---
+        print(f"[SESSION] Student failed attempt (Score: {current_score}). Triggering retry.")
+        
+        # A. Archive the failure so we don't lose the data
+        archive_failed_session(session_data)
+        
+        # B. Reset session state for a fresh attempt at the SAME question
+        session_data["dialogue"] = []
+        session_data["frustration_count"] = 0
+        session_data["safety_violations"] = []
+        session_data["agent_decision"] = None
+        session_data["student_initial_answer"] = None
+        session_data["student_initial_confidence"] = None
+        session_data["student_final_confidence"] = None
+        session_data["score"] = None
+        
+        # Save the "clean" session
+        save_session(session_data)
+        
+        # C. Return Retry Status (No Redirect)
+        return {
+            "status": "retry",
+            "feedback": "Meno is having trouble understanding. Let's try starting over.",
+            "redirect_url": None
+        }
+
+    else:
+        # --- PASS STATE: SUBMIT TO TERRACOTTA ---
+        print(f"[SESSION] Student passed (Score: {current_score}). Completing session.")
+        
+        # Mark the session as completed
         complete_session(session_data)
         
-        # Return a demo completion URL (just reload the page)
-        return {"redirect_url": "/?demo_complete=true"}
-    else:
-        # Normal mode - move to completed and return to Terracotta
-        complete_session(session_data)
-        score = session_data.get("score", 0)
-        return_url = f"{config.TERRACOTTA_RETURN_URL}?launch_token={launch_token}&score={score}"
+        # DETERMINE COMPLETION BEHAVIOR
+        # Only the specific 'demo_session' string triggers the local reload after passing.
+        if launch_token == config.DEMO_SESSION_TOKEN:
+            # Demo mode - Return a demo completion URL (just reload the page)
+            return {"redirect_url": "/?demo_complete=true"}
+        
+        # Handle Normal/Preview -> Return to Terracotta
+        return_url = f"{config.TERRACOTTA_RETURN_URL}?launch_token={launch_token}&score={current_score}"
         return {"redirect_url": return_url}
 
 
