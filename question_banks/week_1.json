@@ -4,99 +4,59 @@
   "questions": [
     {
       "id": "w1_q1",
-      "condition": "ODD",
-      "question_text": "Which of the following best describes the cognitive revolution in psychology?",
+      "question_text": "What is the fundamental premise of the Turing Test?",
       "options": {
-        "A": "A shift from studying observable behavior to studying mental processes",
-        "B": "The invention of brain imaging technology",
-        "C": "The discovery that all learning is based on reinforcement",
-        "D": "The development of psychoanalytic theory"
+        "A": "A computer must convince a judge it can think like a human",
+        "B": "A computer must demonstrate consciousness through physical actions",
+        "C": "A computer must be indistinguishable from a human in conversation",
+        "D": "A computer must solve problems faster than a human"
       },
-      "correct_answer": "A",
-      "misconception_answer": "B",
-      "misconception_description": "The cognitive revolution was triggered by brain imaging technology rather than a theoretical shift in focus from behaviorism to mental processes.",
-      "agent_initial_confidence": 75,
-      "concept_tags": ["cognitive_revolution", "history", "mental_processes"]
+      "correct_answer": "C",
+      "misconception_answer": "A",
+      "misconception_description": "Students confuse the Turing Test's actual criterion (behavioral indistinguishability in conversation) with requiring the computer to genuinely 'think.' The test is about external behavior, not internal mental states or consciousness.",
+      "concept_tags": ["turing_test", "ai_philosophy", "behaviorism", "intelligence_definition"]
     },
     {
       "id": "w1_q2",
-      "condition": "EVEN",
-      "question_text": "Which of the following best describes the cognitive revolution in psychology?",
+      "question_text": "What does the Stroop Effect demonstrate about reading?",
       "options": {
-        "A": "A shift from studying observable behavior to studying mental processes",
-        "B": "The invention of brain imaging technology",
-        "C": "The discovery that all learning is based on reinforcement",
-        "D": "The development of psychoanalytic theory"
+        "A": "That reading requires conscious effort and attention",
+        "B": "That color naming is faster than word reading",
+        "C": "That reading can occur automatically and interfere with other tasks",
+        "D": "That people cannot read and name colors simultaneously"
       },
-      "correct_answer": "A",
-      "misconception_answer": "B",
-      "misconception_description": "The cognitive revolution was triggered by brain imaging technology rather than a theoretical shift in focus from behaviorism to mental processes.",
-      "agent_initial_confidence": 75,
-      "concept_tags": ["cognitive_revolution", "history", "mental_processes"]
+      "correct_answer": "C",
+      "misconception_answer": "D",
+      "misconception_description": "Students misinterpret the Stroop Effect as showing complete inability to perform both tasks, when it actually demonstrates interference from automatic processing. People can name colors, but automatic word reading slows them down—it's interference, not impossibility.",
+      "concept_tags": ["stroop_effect", "automatic_processing", "attention", "interference"]
     },
     {
       "id": "w1_q3",
-      "condition": "ODD",
-      "question_text": "What is the primary function of working memory?",
+      "question_text": "Why can't you see your own eye making a saccade when looking in a mirror?",
       "options": {
-        "A": "To store information permanently for later retrieval",
-        "B": "To temporarily hold and manipulate information during cognitive tasks",
-        "C": "To automatically process sensory information without attention",
-        "D": "To consolidate memories during sleep"
+        "A": "Your brain suppresses visual input during the rapid eye movement",
+        "B": "Saccades occur too quickly for conscious perception",
+        "C": "The mirror reflection is delayed",
+        "D": "Your eyes close briefly during saccades"
       },
-      "correct_answer": "B",
-      "misconception_answer": "A",
-      "misconception_description": "Working memory is the same as with long-term memory, believing working memory is for permanent storage rather than temporary active processing.",
-      "agent_initial_confidence": 80,
-      "concept_tags": ["working_memory", "memory_systems", "cognitive_processes"]
+      "correct_answer": "A",
+      "misconception_answer": "B",
+      "misconception_description": "Students attribute saccadic suppression to simple speed or timing limitations, when it's actually an active neural mechanism. The brain actively suppresses visual processing during saccades to prevent blurred images—it's not just that the movement is 'too fast to see.'",
+      "concept_tags": ["saccades", "visual_perception", "neural_suppression", "eye_movements", "saccadic_suppression"]
     },
     {
       "id": "w1_q4",
-      "condition": "EVEN",
-      "question_text": "What is the primary function of working memory?",
+      "question_text": "According to John Searle (1990), who came up with the Chinese Room argument, which of the following would describe a computer that successfully passes the Turing test?",
       "options": {
-        "A": "To store information permanently for later retrieval",
-        "B": "To temporarily hold and manipulate information during cognitive tasks",
-        "C": "To automatically process sensory information without attention",
-        "D": "To consolidate memories during sleep"
+        "A": "Strong AI",
+        "B": "Weak AI",
+        "C": "An intelligent system",
+        "D": "Artificial General Intelligence"
       },
       "correct_answer": "B",
-      "misconception_answer": "A",
-      "misconception_description": "The agent confuses working memory with long-term memory, believing working memory is for permanent storage rather than temporary active processing.",
-      "agent_initial_confidence": 80,
-      "concept_tags": ["working_memory", "memory_systems", "cognitive_processes"]
-    },
-    {
-      "id": "w1_q5",
-      "condition": "ODD",
-      "question_text": "Which example best demonstrates automatic processing?",
-      "options": {
-        "A": "Learning a new phone number by repeating it",
-        "B": "Reading words fluently after years of practice",
-        "C": "Solving a complex math problem step by step",
-        "D": "Trying to remember what you ate for breakfast"
-      },
-      "correct_answer": "B",
-      "misconception_answer": "D",
-      "misconception_description": "The agent thinks retrieval from memory is always automatic, failing to distinguish between effortful recall and truly automatic processes that occur without attention.",
-      "agent_initial_confidence": 70,
-      "concept_tags": ["automatic_processing", "attention", "skill_learning"]
-    },
-    {
-      "id": "w1_q6",
-      "condition": "EVEN",
-      "question_text": "Which example best demonstrates automatic processing?",
-      "options": {
-        "A": "Learning a new phone number by repeating it",
-        "B": "Reading words fluently after years of practice",
-        "C": "Solving a complex math problem step by step",
-        "D": "Trying to remember what you ate for breakfast"
-      },
-      "correct_answer": "B",
-      "misconception_answer": "D",
-      "misconception_description": "The agent thinks retrieval from memory is always automatic, failing to distinguish between effortful recall and truly automatic processes that occur without attention.",
-      "agent_initial_confidence": 70,
-      "concept_tags": ["automatic_processing", "attention", "skill_learning"]
+      "misconception_answer": "C",
+      "misconception_description": "Students conflate passing the Turing Test with genuine intelligence or understanding. Searle's argument explicitly distinguishes weak AI (simulation of intelligence without understanding) from strong AI (genuine understanding). Passing the Turing Test demonstrates weak AI—behavioral simulation, not true comprehension.",
+      "concept_tags": ["chinese_room", "strong_ai", "weak_ai", "searle", "understanding_vs_simulation", "philosophy_of_mind"]
     }
   ]
 }
