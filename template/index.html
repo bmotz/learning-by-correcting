@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Explain It For Meno</title>
+    <title>Explain It</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;600;700&family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
@@ -159,7 +159,7 @@
             color: var(--color-text);
         }
         
-        /* NEW: Instruction text for slider */
+        /* Instruction text for slider */
         .slider-instruction {
             font-weight: 400;
             color: var(--color-text-light);
@@ -218,7 +218,7 @@
             opacity: 0; /* NEW: Start invisible */
         }
         
-        /* NEW: Show thumb after interaction */
+        /* Show thumb after interaction */
         .slider.interacted::-webkit-slider-thumb {
             opacity: 1;
         }
@@ -405,6 +405,13 @@
             color: var(--color-text-light);
             cursor: not-allowed;
             transform: none;
+        }
+
+        .button-success {
+            background-color: #4CAF50 !important;
+            border-color: #4CAF50 !important;
+            color: white !important;
+            transition: all 0.3s ease;
         }
         
         .button-group {
@@ -633,11 +640,12 @@
         }
     </style>
 </head>
+<script type="module" src="https://terracotta-js.s3.us-east-2.amazonaws.com/integrations.resize.custom.js"></script>
 <body>
     <div class="container">
         <header>
-            <h1>Explain It For Meno</h1>
-            <p class="subtitle">Help Meno understand the correct answer</p>
+            <h1>Explain It</h1>
+            <p class="subtitle">Don't just identify the correct answer -- explain it in your own words.</p>
         </header>
         
         <!-- Demo Mode Banner -->
@@ -705,7 +713,7 @@
         <!-- Phase 3: Final Confidence -->
         <div id="phase-final-confidence" class="card hidden">
             <h2 style="font-family: var(--font-display); margin-bottom: var(--spacing-md);">How confident are you now?</h2>
-            <p style="margin-bottom: var(--spacing-lg);">After teaching Meno, how confident are you in the correct answer?</p>
+            <p style="margin-bottom: var(--spacing-lg);">After explaining it, how confident are you in the correct answer?</p>
             
             <div class="confidence-section">
                 <label for="final-confidence" class="confidence-label">
@@ -740,7 +748,7 @@
             <h2 class="result-title" id="result-title"></h2>
             <p class="feedback-text" id="feedback-text"></p>
             <div class="button-group">
-                <button class="button" id="return-button">Return to Course</button>
+                <button class="button" id="return-button">Submit for Credit</button>
             </div>
         </div>
     </div>
@@ -753,6 +761,8 @@
         // Get launch token from URL
         const urlParams = new URLSearchParams(window.location.search);
         launchToken = urlParams.get('launch_token');
+        const conditionName = urlParams.get('condition_name') || 'dialogue';
+        const isControlCondition = conditionName === 'control';
         
         if (!launchToken) {
             showError('No launch token found');
@@ -765,6 +775,23 @@
         }
         
         async function init() {
+            // Fetch config data about condition first 
+            try {
+                const configResponse = await fetch('/api/config');
+                if (configResponse.ok) {
+                    window.configData = await configResponse.json();
+                } else {
+                    throw new Error('Config response not OK');
+                }
+            } catch (error) {
+                console.log('Could not fetch config data, using defaults:', error);
+                window.configData = { 
+                    MIN_EXPLANATION_WORDS: 24,
+                    DIALOGUE_CONDITION_NAME: 'dialogue',
+                    CONTROL_CONDITION_NAME: 'control'
+                };
+            }
+            // Main initialization
             try {
                 const response = await fetch(`/api/session/${launchToken}`);
                 sessionData = await response.json();
@@ -808,7 +835,7 @@
                 
                 // Check if already have initial answer (returning to session)
                 if (sessionData.student_initial_answer) {
-                    startDialogue();
+                    await startDialogue();
                 }
                 
             } catch (error) {
@@ -855,13 +882,13 @@
                 const response = await fetch(`/api/session/${launchToken}`);
                 sessionData = await response.json();
                 
-                startDialogue();
+                await startDialogue();
             } catch (error) {
                 showError(error.message);
             }
         };
         
-        function startDialogue() {
+        async function startDialogue() {
             // Don't hide phase-initial, but transform it into reminder mode
             const phaseInitial = document.getElementById('phase-initial');
             
@@ -906,6 +933,11 @@
                 optionsReminder.appendChild(optionDiv);
             });
             
+            if (isControlCondition) {
+                showExplanationInterface();
+                return; // stop here, don't load Meno!
+            }
+            
             // Show dialogue phase
             document.getElementById('phase-dialogue').classList.remove('hidden');
 
@@ -917,14 +949,14 @@
             
             let framingText = '';
             if (studentChoice === correct) {
-                framingText = `The correct answer is ${correct} (${correctText}). You initially chose this same answer. Now teach Meno why that reasoning is correct.`;
+                framingText = `<p style="margin-bottom:6px;"><strong>The correct answer is ${correct} (${correctText}), and you got it right.</strong></p> <p>Meno is a student in your class who got the question wrong. In the chat below, try to <strong>explain the correct answer to Meno</strong>.</p>`;
             } else if (studentChoice === agentChoice) {
-                framingText = `The correct answer is ${correct} (${correctText}). You initially chose ${studentChoice}, which is the same misconception Meno has. Teach Meno why that reasoning is mistaken.`;
+                framingText = `<p style="margin-bottom:6px;"><strong>The correct answer is ${correct} (${correctText}).</strong> You initially chose ${studentChoice}.</p> <p>Meno is a student in your class who also got it wrong. In the chat below, try to <strong>explain the correct answer to Meno</strong>.</p>`;
             } else {
-                framingText = `The correct answer is ${correct} (${correctText}). You initially chose ${studentChoice}, but Meno chose ${agentChoice}. Teach Meno why their misconception is wrong.`;
+                framingText = `<p style="margin-bottom:6px;"><strong>The correct answer is ${correct} (${correctText}).</strong> You initially chose ${studentChoice}.</p> <p>Meno is a student in your class who also got it wrong. In the chat below, try to <strong>explain the correct answer to Meno</strong>.</p>`;
             }
             
-            document.getElementById('framing-text').textContent = framingText;
+            document.getElementById('framing-text').innerHTML = framingText;
             
             // Display existing dialogue
             const container = document.getElementById('dialogue-container');
@@ -986,7 +1018,7 @@
                 if (sessionData.agent_decision.assessment === 'PASS') {
                     showFinalConfidence();
                 } else {
-                    showResults();
+                    await showResults();
                 }
             } else {
                 messageInput.focus();
@@ -1071,7 +1103,7 @@
                             sessionData = await sessionResponse.json();
                             
                             // Show results directly without confidence
-                            showResults();
+                            await showResults();
                         }
                         return;
                     } else if (data.status === 'completed') {
@@ -1089,7 +1121,7 @@
                         if (data.skip_confidence === false) {
                             showFinalConfidence();
                         } else {
-                            showResults();
+                            await showResults();
                         }
                         return;
                     }
@@ -1181,7 +1213,7 @@
                         showFinalConfidence();
                     } else {
                         // This is a FAIL - skip confidence and go straight to results
-                        showResults();
+                        await showResults();
                     }
                 } else {
                     // Re-enable input
@@ -1241,14 +1273,22 @@
                 // Fail state
                 console.log('[DEBUG] Showing fail state');
                 
-                // Keep box beige (default), make ellipses static and gray
+                // Stop the bouncing animation and make ellipses static gray
+                ellipses.classList.remove('typing-indicator');
                 ellipses.classList.add('static');
+                
+                // Make each dot static and gray
+                const dots = ellipses.querySelectorAll('span');
+                dots.forEach(dot => {
+                    dot.style.animation = 'none';
+                    dot.style.opacity = '0.3';
+                });
                 
                 // Wait a moment
                 await new Promise(resolve => setTimeout(resolve, 600));
                 
                 // Show results directly
-                showResults();
+                await showResults();
             }
         }
         
@@ -1307,69 +1347,340 @@
                 });
                 
                 sessionData.student_final_confidence = parseInt(confidence);
-                showResults();
+                await showResults();
             } catch (error) {
                 showError(error.message);
             }
         };
         
-        function showResults() {
-            // Keep dialogue visible, hide final confidence if it's showing
+        async function showResults(resultData = null) {
+            // If no data provided, fetch it from the /complete endpoint
+            if (!resultData) {
+                try {
+                    const response = await fetch(`/api/session/${launchToken}/complete`, {
+                        method: 'POST'
+                    });
+                    resultData = await response.json();
+                } catch (error) {
+                    showError(error.message);
+                    return;
+                }
+            }
+
+            // 1. Setup: Hide confidence, show results container
             const finalConfidenceElement = document.getElementById('phase-final-confidence');
             if (finalConfidenceElement && !finalConfidenceElement.classList.contains('hidden')) {
                 finalConfidenceElement.classList.add('hidden');
             }
             
-            // Show results card (dialogue and question remain visible above)
-            document.getElementById('phase-results').classList.remove('hidden');
-            
-            const decision = sessionData.agent_decision;
-            const isPassed = decision && decision.assessment === 'PASS';
-            
+            const resultsCard = document.getElementById('phase-results');
+            resultsCard.classList.remove('hidden');
+
+            // 2. Identify UI Elements
             const resultTitle = document.getElementById('result-title');
-            resultTitle.textContent = isPassed ? '✓ Teaching Successful' : '○ More Practice Needed';
-            resultTitle.className = `result-title ${isPassed ? 'pass' : 'fail'}`;
-            
-            // Handle different feedback scenarios
-            let feedbackText = '';
-            if (decision && decision.feedback) {
-                feedbackText = decision.feedback;
-            } else if (sessionData.safety_violations && sessionData.safety_violations.length > 0) {
-                const violation = sessionData.safety_violations[0];
-                feedbackText = `Dialogue ended due to ${violation.replace(/_/g, ' ')}`;
+            const feedbackTextEl = document.getElementById('feedback-text');
+            // Ensure your HTML button has id="return-button"
+            const actionButton = document.getElementById('return-button'); 
+
+            // ---------------------------------------------------------
+            // SCENARIO A: RETRY MODE (Soft Fail)
+            // ---------------------------------------------------------
+            if (resultData && resultData.status === 'retry') {
+                // Style: Fail
+                resultTitle.textContent = 'Let\'s Try Again';
+                resultTitle.className = 'result-title fail';
+                
+                // Feedback from server
+                feedbackTextEl.textContent = resultData.feedback || "Meno needs a bit more help understanding. Let's restart this question.";
+                
+                // Button: RELOAD PAGE
+                if (actionButton) {
+                    actionButton.textContent = "Try Again ↻";
+                    actionButton.className = "button";
+                    actionButton.onclick = function() {
+                        window.location.reload();
+                    }; 
+                }
+                
+            // ---------------------------------------------------------
+            // SCENARIO B: SUCCESS / STANDARD COMPLETION
+            // ---------------------------------------------------------
             } else {
-                feedbackText = 'The dialogue could not be completed.';
+                // Logic: Use existing sessionData to determine Pass/Fail visual
+                const decision = sessionData.agent_decision;
+                // Default to true if we made it this far without a 'retry' status
+                const isPassed = (decision && decision.assessment === 'PASS'); 
+                
+                // Style: Pass
+                resultTitle.textContent = isPassed ? '✓ Teaching Successful' : 'Completed';
+                resultTitle.className = `result-title ${isPassed ? 'pass' : 'fail'}`;
+                
+                // Feedback
+                let feedbackText = '';
+                if (decision && decision.feedback) {
+                    feedbackText = decision.feedback;
+                } else if (sessionData.safety_violations && sessionData.safety_violations.length > 0) {
+                    const violation = sessionData.safety_violations[0];
+                    feedbackText = `Dialogue ended due to ${violation.replace(/_/g, ' ')}`;
+                } else {
+                    feedbackText = 'Your explanation has passed.';
+                }
+                feedbackTextEl.textContent = feedbackText;
+
+                // Button: REDIRECT TO TERRACOTTA
+                // We use the redirect_url passed in resultData
+                if (actionButton && resultData && resultData.redirect_url) {
+                    actionButton.textContent = "Submit for Credit";
+                    actionButton.className = "button"; 
+                    actionButton.onclick = function() {
+                        window.location.href = resultData.redirect_url;
+                    };
+                }
             }
-            
-            document.getElementById('feedback-text').textContent = feedbackText;
-            
+
             // Scroll to show results
             window.scrollTo(0, document.body.scrollHeight);
         }
-        
-        document.getElementById('return-button').onclick = async () => {
+
+        function showExplanationInterface() {
+            // Hide dialogue interface if visible
+            document.getElementById('phase-dialogue').classList.add('hidden');
+            
+            // Create explanation interface
+            const container = document.getElementById('phase-explanation');
+            if (!container) {
+                // Create container if it doesn't exist
+                const newContainer = document.createElement('div');
+                newContainer.id = 'phase-explanation';
+                newContainer.className = 'hidden';
+                
+                // Insert BEFORE phase-final-confidence (same position as phase-dialogue)
+                const finalConfidence = document.getElementById('phase-final-confidence');
+                const parentContainer = document.querySelector('.container');
+                
+                if (finalConfidence) {
+                    parentContainer.insertBefore(newContainer, finalConfidence);
+                } else {
+                    // Fallback if phase-final-confidence doesn't exist yet
+                    parentContainer.appendChild(newContainer);
+                }
+            }
+            
+            const correctAnswer = sessionData.question.correct_answer;
+            const studentAnswer = sessionData.student_initial_answer;
+            const correctText = sessionData.question.options[correctAnswer];
+            
+            const explanationHTML = `
+                <div class="card dialogue-card">
+                    <h3>Explain the Correct Answer</h3>
+                    <div class="instruction-text" style="margin-bottom: var(--spacing-md);">
+                        The correct answer is <strong>${correctAnswer}</strong>. 
+                        ${studentAnswer === correctAnswer ? 
+                            'You initially chose the correct answer.' : 
+                            `You initially chose ${studentAnswer}.`}
+                        <br><br>
+                        Please explain why <strong>${correctText}</strong> is the correct answer.
+                    </div>
+                    
+                    <div class="explanation-input-container">
+                        <textarea 
+                            id="explanation-textarea" 
+                            class="explanation-input"
+                            placeholder="Type your explanation here..."
+                            rows="6"
+                            style="width: 100%; padding: var(--spacing-sm); font-family: var(--font-body); 
+                                font-size: 1rem; border: 2px solid var(--color-border); 
+                                border-radius: 8px; resize: vertical;"
+                        ></textarea>
+                        
+                        <div class="input-footer" style="display: flex; justify-content: space-between; 
+                            align-items: center; margin-top: var(--spacing-sm);">
+                            <span id="word-count" class="word-counter" 
+                                style="color: var(--color-text-light); font-size: 0.9rem;">
+                                0/${configData.MIN_EXPLANATION_WORDS || 24} words
+                            </span>
+                            <button id="submit-explanation" class="button" disabled>
+                                Submit Explanation
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div id="scoring-feedback" class="hidden" style="margin-top: var(--spacing-md);">
+                        <!-- Scoring results will appear here -->
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('phase-explanation').innerHTML = explanationHTML;
+            document.getElementById('phase-explanation').classList.remove('hidden');
+            
+            // Set up word counting and button enabling
+            const textarea = document.getElementById('explanation-textarea');
+            const wordCountSpan = document.getElementById('word-count');
+            const submitButton = document.getElementById('submit-explanation');
+            const minWords = configData.MIN_EXPLANATION_WORDS || 24;
+            
+            textarea.addEventListener('input', () => {
+                const words = textarea.value.trim().split(/\s+/).filter(word => word.length > 0);
+                const wordCount = words.length;
+                wordCountSpan.textContent = `${wordCount}/${minWords} words`;
+                
+                if (wordCount >= minWords) {
+                    submitButton.disabled = false;
+                    wordCountSpan.style.visibility = 'hidden';
+                } else {
+                    submitButton.disabled = true;
+                    wordCountSpan.style.visibility = 'visible';
+                    wordCountSpan.style.color = 'var(--color-text-light)';
+                }
+            });
+            
+            // Handle submission
+            submitButton.addEventListener('click', handleExplanationSubmit);
+        }
+
+        async function handleExplanationSubmit() {
+            const textarea = document.getElementById('explanation-textarea');
+            const submitButton = document.getElementById('submit-explanation');
+            const feedbackDiv = document.getElementById('scoring-feedback');
+            
+            // Disable inputs during evaluation
+            textarea.disabled = true;
+            submitButton.disabled = true;
+            
+            // Show thinking animation
+            submitButton.innerHTML = `
+                <div class="thinking-ellipses" style="padding: 0; gap: 6px; justify-content: center; height: 100%; min-height: 24px;">
+                    <span style="background-color: white; width: 8px; height: 8px;"></span>
+                    <span style="background-color: white; width: 8px; height: 8px; animation-delay: 0.2s;"></span>
+                    <span style="background-color: white; width: 8px; height: 8px; animation-delay: 0.4s;"></span>
+                </div>
+            `;
+            
             try {
-                const response = await fetch(`/api/session/${launchToken}/complete`, {
-                    method: 'POST'
+                // Call evaluation endpoint
+                const response = await fetch(`/api/session/${launchToken}/evaluate_explanation`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        explanation: textarea.value
+                    })
                 });
                 
-                const data = await response.json();
+                const result = await response.json();
                 
-                // Check if demo completion
-                if (data.redirect_url.includes('demo_complete=true')) {
-                    // Demo mode - offer to restart
-                    if (confirm('Demo complete! Would you like to try another question?')) {
-                        window.location.href = '/';
+                if (result.status === 'error') {
+                    // Handle errors
+                    if (result.error_type === 'word_count') {
+                        feedbackDiv.innerHTML = `
+                            <div class="error-message" style="color: #d32f2f;">
+                                ${result.message}
+                            </div>
+                        `;
+                    } else {
+                        feedbackDiv.innerHTML = `
+                            <div class="error-message" style="color: #d32f2f;">
+                                ${result.message}
+                            </div>
+                        `;
                     }
-                } else {
-                    // Normal mode - return to Terracotta
-                    window.location.href = data.redirect_url;
+                    feedbackDiv.classList.remove('hidden');
+                    // Re-enable inputs for retry
+                    textarea.disabled = false;
+                    submitButton.disabled = false;
+                    return;
                 }
+                
+                if (result.passed) {
+                    // Success! 
+                    // Update submit button from ellipses
+                    submitButton.className = 'button button-success';
+                    submitButton.innerHTML = '✓';
+                    // Display scoring results
+                    feedbackDiv.classList.remove('hidden');
+                    displayScoringResults(result);
+                    // Show final confidence after a brief delay
+                    setTimeout(() => {
+                        showFinalConfidence();
+                    }, 1500);
+                } else {
+                    // Failed - allow revision
+                    textarea.disabled = false;
+                    submitButton.disabled = false;
+                    submitButton.textContent = 'Resubmit Explanation';
+                    feedbackDiv.classList.remove('hidden');
+                    displayScoringResults(result);
+                }
+                
             } catch (error) {
-                showError(error.message);
+                feedbackDiv.innerHTML = `
+                    <div class="error-message" style="color: #d32f2f;">
+                        An error occurred. Please try again or contact your instructor.
+                    </div>
+                `;
+                textarea.disabled = false;
+                submitButton.disabled = false;
             }
-        };
-        
+        }
+
+        function displayScoringResults(result) {
+            const feedbackDiv = document.getElementById('scoring-feedback');
+            
+            let html = '<div class="scoring-results" style="padding: var(--spacing-md); background: #f5f5f5; border-radius: 8px;">';
+            
+            // Display scores for each dimension with horizontal bars
+            html += '<h4 style="margin-bottom: var(--spacing-sm);">Evaluation Results:</h4>';
+            html += '<div class="dimension-scores" style="display: flex; flex-direction: column; gap: var(--spacing-xs);">';
+
+            for (const [dimension, evaluation] of Object.entries(result.evaluation)) {
+                const passed = evaluation.passed;
+                const dotProduct = evaluation.dot_product;
+                const isAvailable = dotProduct !== null;
+                
+                // Colors and styling
+                const barColor = !isAvailable ? '#9E9E9E' : (passed ? '#4CAF50' : '#FF9800');
+                const textColor = !isAvailable ? '#757575' : (passed ? '#4CAF50' : '#FF9800');
+                const percentage = isAvailable ? (dotProduct * 100).toFixed(0) : null;
+                const barWidth = isAvailable ? percentage : 0;
+                
+                html += `
+                    <div class="dimension-result" style="margin-bottom: 8px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                            <span style="font-weight: 600; font-size: 14px;">${dimension}</span>
+                            <span style="color: ${textColor}; font-size: 14px; min-width: 45px; text-align: right;">
+                                ${isAvailable ? percentage + '%' : 'N/A'}
+                            </span>
+                        </div>
+                        <div style="position: relative; width: 100%; height: 20px; background-color: #E0E0E0; border-radius: 4px; overflow: hidden;">
+                            ${isAvailable ? 
+                                `<div style="position: absolute; top: 0; left: 0; height: 100%; 
+                                    width: ${barWidth}%; background-color: ${barColor}; 
+                                    transition: width 0.3s ease;"></div>` : 
+                                `<div style="position: absolute; top: 0; left: 0; height: 100%; 
+                                    width: 100%; background-color: ${barColor}; opacity: 0.3;"></div>`
+                            }
+                        </div>
+                    </div>
+                `;
+            }
+
+            html += '</div>';
+            
+            // Display feedback messages if any
+            if (result.feedback && result.feedback.length > 0) {
+                html += '<div class="feedback-messages" style="margin-top: var(--spacing-md); color: #FF9800;">';
+                html += '<strong>Please improve:</strong><ul style="margin-top: var(--spacing-xs); margin-left: 20px; padding-left: 0;">';
+                for (const message of result.feedback) {
+                    html += `<li>${message}</li>`;
+                }
+                html += `</ul> <p style="margin-top: var(--spacing-xs);">If you're having trouble, try restating the correct answer and describing how it connects with the question's text. Longer explanations are not necessarily better.</p></div>`;
+            } 
+            
+            html += '</div>';
+            feedbackDiv.innerHTML = html;
+
+        }
+
         function showError(message) {
             const errorContainer = document.getElementById('error-container');
             errorContainer.innerHTML = `<div class="error-message">${message}</div>`;
