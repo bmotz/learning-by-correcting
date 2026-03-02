@@ -37,6 +37,8 @@ ASSIGNMENT_MAPPING = {
     "18630284": 1,
     "18630293": 2,
     "18630294": 3,
+    "18717108": 4,
+    "18717111": 5,
     "test_assignment": 1  # For development/testing
 }
 
@@ -177,6 +179,6 @@ DIMENSION_FEEDBACK = {
 }
 
 # Dot product thresholds
-DOT_PRODUCT_PASS = 0.7
-DOT_PRODUCT_CONDITIONAL = 0.5
+DOT_PRODUCT_PASS = 0.5
+DOT_PRODUCT_CONDITIONAL = 0.25
 CONFIDENCE_THRESHOLD = 0.5
