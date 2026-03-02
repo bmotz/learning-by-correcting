@@ -757,6 +757,7 @@
         let sessionData = null;
         let launchToken = null;
         let selectedAnswer = null;
+        let isWorkSaved = false;
         
         // Get launch token from URL
         const urlParams = new URLSearchParams(window.location.search);
@@ -764,6 +765,15 @@
         const conditionName = urlParams.get('condition_name') || 'dialogue';
         const isControlCondition = conditionName === 'control';
         
+        // Add listener for page exit/refresh
+        window.addEventListener('beforeunload', function (e) {
+            // If work isn't saved/finished, trigger the browser warning
+            if (!isWorkSaved) {
+                e.preventDefault();
+                e.returnValue = ''; // Required for Chrome
+            }
+        });
+
         if (!launchToken) {
             showError('No launch token found');
         }
@@ -1392,12 +1402,13 @@
                 
                 // Feedback from server
                 feedbackTextEl.textContent = resultData.feedback || "Meno needs a bit more help understanding. Let's restart this question.";
-                
+
                 // Button: RELOAD PAGE
                 if (actionButton) {
                     actionButton.textContent = "Try Again ↻";
                     actionButton.className = "button";
                     actionButton.onclick = function() {
+                        isWorkSaved = true; // Disable exit warning
                         window.location.reload();
                     }; 
                 }
@@ -1433,6 +1444,7 @@
                     actionButton.textContent = "Submit for Credit";
                     actionButton.className = "button"; 
                     actionButton.onclick = function() {
+                        isWorkSaved = true; // Disable exit warning 
                         window.location.href = resultData.redirect_url;
                     };
                 }
